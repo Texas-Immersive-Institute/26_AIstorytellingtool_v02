@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-11-14 by Claude Code_
+_Last updated: 2026-11-17 by Claude Code_
 
 ## Current focus
 
@@ -23,12 +23,15 @@ Takes has started (2026-11-13, user's call to begin it now): Takes talks to the 
 - [x] Takes milestone 2, projects / shots / takes / voice reference / upscale this take (2026-11-13), server and API (no screens yet): projects folder chosen on first start (`PUT /api/settings`, suggests Documents/AI Takes Projects); each project is a folder with `project.json`, `media/` and `takes/<take id>/`. Shots: add (or insert after), rename, notes, reorder (full id list, for drag), delete. Takes per shot: generate, choose the take that plays (first finished take is chosen automatically), cancel, delete (falls back to the newest finished take), play. Voice reference: `voice_takes` speaks the line in the recorded voice, take 1 is kept in the project and forced in as <Audio 1>, and the video length comes from it (ffprobe, rounded up to an H3 length). Upscale this take: same request and seed on the upscale stage (a voice take reuses its spoken line), and the upscaled take becomes the chosen one. Takes waiting or rendering when Takes closed are picked up on the next start without re-queueing. 106 Python tests and ruff pass. Real renders on this computer (RTX 3080 Ti): voice-reference take in 195 s (line 5.18 s → video 5.17 s, voice confirmed in the soundtrack), native take in 85 s, its upscale in 155 s (1088×1952, 48 fps, same take as the source, then chosen automatically).
 - [x] Takes UI and launchers (2026-11-14): `apps/takes/web` (React + Vite, Story's look). Projects screen, first-start folder, Settings (projects folder, ComfyUI address, readiness). Project screen: shot list with drag to reorder, add / insert after / rename / notes / delete; a player for the selected take (or any take you watch) and the take list (status and elapsed time, ★ select, ⬆ upscale this take, cancel, delete, reuse settings); a generate form with frame / audio / upscale toggles, drop-or-click picture and audio slots, voice reference (recording, line, tone, length estimate), length, size, seed. The form remembers what you typed per shot and starts from the shot's newest take; the screen refreshes every 2 s while anything renders. `takestool` now serves the built UI and opens it in a pywebview window (`--browser` for the web browser, `--no-window` for the server only; falls back to the browser if no window can open; a second start opens another window on the running server). `start-takes.command` / `start-takes.bat` build the UI when its source changed, then run `takestool`. Checked on this Mac with a throwaway project (ComfyUI not running): screens, select, add shot, drag-reorder (saved), picture upload, a generate that fails cleanly with "ComfyUI isn't running"; `start-takes.command` rebuilt the UI and opened the native window. 107 Python tests, ruff, 3 web tests and the build pass.
 - [x] Verified 2026-11-11: 78 Python tests, 11 web tests, type-check and build pass. In the browser: Settings, a phone-sized Chat sending a message, the Debug view, the Stage view, and a live playthrough where Codex picked "Sir Barksalot" from chat in 7.3 s and wrote Mara's line in 13.5 s.
+- [x] Installers (2026-11-17): `install.command` (macOS) and `install.bat` (Windows) install uv, Node.js and ffmpeg when missing, run `uv sync`, then `npm ci` and build both UIs; safe to run again. `install.command` was run on this Mac (uv and Node present, no Homebrew, Homebrew declined): it synced, built both UIs and reported ffmpeg as missing. `install.bat` has not been run on Windows yet.
+- [x] Stopped tracking generated files (2026-11-17, user decision): `.gitignore` added; `node_modules/`, `dist/` and `__pycache__/` removed from git (about 7,750 files, still on disk). The tracked `node_modules` held the macOS-only `@rolldown/binding-darwin-arm64`, which broke UI builds on a Windows clone. Not committed yet.
 
 ## Next
 
 - [ ] Takes: show progress while rendering (ComfyUI websocket)
 - [ ] Takes: extend as continuation shots (ADR-0004: in-point on the low-res take, 24 fps ffmpeg copy of an upscaled source)
 - [ ] Takes: back-to-back sequence playback
+- [ ] Run `install.bat` on the Windows PC (winget installs, PATH refresh, both UI builds)
 - [ ] Takes: try the UI against the real H3 ComfyUI on the Windows PC (generate, voice reference, upscale) via `start-takes.bat`
 
 - [ ] 7. Step through a saved playthrough in the Debug view; polish

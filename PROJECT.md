@@ -56,6 +56,7 @@ Vocabulary for each app lives in its `CONTEXT.md`; see `CONTEXT-MAP.md`.
 - `apps/takes/src/takes_app/` — Takes server: `comfyui.py` (ComfyUI client and readiness check), `pack.py` (H3 pack loader, fills recipes in), `stages.py` (toggles → H3 stage, generate request, voice reference, H3 lengths), `store.py` (project folders: `project.json` with shots and takes, `media/`, `takes/`), `generator.py` (renders takes one at a time: voice step, upscale, resume after restart), `api.py` (first-start folder, projects, shots, takes), `__main__.py` (`takestool`, `takestool check`)
 - `apps/takes/web/` — Takes UI (React + Vite): `src/screens/` (setup, projects, settings), `src/project/` (shot list, take list and player, generate form, media slots)
 - `examples/lighthouse/` — example story using every part of the format
+- `install.bat` / `install.command` — one-time setup on a new computer: installs uv, Node.js and ffmpeg if missing (winget on Windows, Homebrew on macOS, asking before installing Homebrew), runs `uv sync`, and clean-installs (`npm ci`) and builds both UIs
 - `start-story.bat` — builds the UI if needed and starts Story (`start-story.command` on macOS; `-lan` variants for both)
 - `start-takes.bat` / `start-takes.command` — builds the Takes UI if needed and opens Takes in its window
 - `apps/takes/workflow_packs/h3_seed_hunter/` — Takes' copy of the H3 pack (recipes, `pack.json`, `PROMPTING.md`); the README names the source commit

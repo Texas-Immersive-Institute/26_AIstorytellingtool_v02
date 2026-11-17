@@ -1,0 +1,15 @@
+# Generated files: rebuilt by install.command / install.bat and the start launchers.
+
+# UI packages (npm ci from package-lock.json) and UI builds (npm run build)
+node_modules/
+dist/
+
+# Python environment and caches (uv sync)
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# macOS Finder
+.DS_Store
