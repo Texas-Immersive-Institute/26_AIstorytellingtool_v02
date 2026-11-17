@@ -10,6 +10,7 @@ waiting take free (ADR-0006). Takes that were rendering when Takes closed are pi
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import random
 import shutil
@@ -22,12 +23,21 @@ from takes_app.comfyui import (
     ComfyStatus,
     ComfyUI,
     ComfyUnreachable,
+    Progress,
     outputs_of,
     run_error,
 )
 from takes_app.pack import Pack, PackError
-from takes_app.stages import VOICE_STAGE, estimate_spoken_s, fit_duration
-from takes_app.store import ProjectStore, StoreError, Take, TakeFile, TakeStatus, now
+from takes_app.stages import EXTEND_OVERLAP_S, VOICE_STAGE, estimate_spoken_s, fit_duration
+from takes_app.store import (
+    ProjectStore,
+    RenderProgress,
+    StoreError,
+    Take,
+    TakeFile,
+    TakeStatus,
+    now,
+)
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +66,36 @@ async def probe_seconds(path: Path) -> float | None:
         return None
 
 
+def _show(take: Take, progress: Progress) -> None:
+    """Keep a take's live progress; a step count without a node keeps the node it belongs to."""
+    node = progress.node or (take.progress.node if take.progress else None)
+    take.progress = RenderProgress(node=node, step=progress.step, steps=progress.steps)
+
+
+async def to_24fps(src: Path, dest: Path) -> None:
+    """A 24 fps copy of a video, for H3's extend stages (upscaled takes are 48 fps, ADR-0004)."""
+    exe = shutil.which("ffmpeg")
+    if not exe:
+        raise ComfyError(
+            "Extending an upscaled take needs ffmpeg to make a 24 fps copy for H3. Install it "
+            "(install.command or install.bat), then try again."
+        )
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_name(f"{dest.stem}.part{dest.suffix}")
+    proc = await asyncio.create_subprocess_exec(
+        exe, "-y", "-v", "error", "-i", str(src), "-r", "24",
+        "-c:v", "libx264", "-crf", "16", "-pix_fmt", "yuv420p", "-c:a", "aac", str(tmp),
+        stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
+    )  # fmt: skip
+    _, err = await proc.communicate()
+    if proc.returncode != 0:
+        tmp.unlink(missing_ok=True)
+        raise ComfyError(
+            f"ffmpeg couldn't make the 24 fps copy: {err.decode(errors='replace')[-300:]}"
+        )
+    tmp.replace(dest)
+
+
 class Generator:
     def __init__(
         self,
@@ -65,6 +105,7 @@ class Generator:
         connect: Callable[[], Awaitable[ComfyStatus]],
         make_comfy: Callable[[str], ComfyUI] = ComfyUI,
         probe: Callable[[Path], Awaitable[float | None]] = probe_seconds,
+        retime: Callable[[Path, Path], Awaitable[None]] = to_24fps,
         poll_s: float = 5.0,
         max_wait_s: float = 3 * 3600,
         unreachable_grace: int = 12,
@@ -74,6 +115,7 @@ class Generator:
         self.connect = connect
         self.make_comfy = make_comfy
         self.probe = probe
+        self.retime = retime
         self.poll_s = poll_s
         self.max_wait_s = max_wait_s
         self.unreachable_grace = unreachable_grace
@@ -173,24 +215,48 @@ class Generator:
             raise ComfyError(ready.message)
 
         async with self.make_comfy(ready.url) as comfy:
-            if not resuming:
-                req = take.request
-                if take.seed is None:
-                    take.seed = req.seed if req.seed is not None else random.randrange(MAX_SEED)
-                if req.audio == "voice" and take.voice_audio is None:
-                    status("voicing")
-                    take.voice_audio = await self._speak(comfy, store, slug, take)
-                workflow = await self._video_workflow(comfy, store, slug, take)
-                if take.cancel_requested:
-                    raise Cancelled
-                take.prompt_id = await comfy.queue_prompt(workflow)
-                status("rendering")
+            connected = asyncio.Event()
+            watcher = asyncio.create_task(comfy.watch(lambda p: _show(take, p), connected))
+            try:
+                await connected.wait()  # so ComfyUI knows where to send this run's progress
+                await self._render(comfy, store, slug, take, resuming, status)
+            finally:
+                watcher.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await watcher
+                take.progress = None
 
-            entry = await self._wait(comfy, take, take.prompt_id or "")
-            status("downloading")
-            take.files = await self._collect(comfy, entry, store.take_dir(slug, take.id))
-            take.error = None
-            self._finish(take, "done")
+    async def _render(
+        self,
+        comfy: ComfyUI,
+        store: ProjectStore,
+        slug: str,
+        take: Take,
+        resuming: bool,
+        status: Callable[[TakeStatus], None],
+    ) -> None:
+        if resuming:
+            comfy.track(take.prompt_id or "")
+        if not resuming:
+            req = take.request
+            if take.seed is None:
+                take.seed = req.seed if req.seed is not None else random.randrange(MAX_SEED)
+            if req.audio == "voice" and take.voice_audio is None:
+                status("voicing")
+                take.voice_audio = await self._speak(comfy, store, slug, take)
+            workflow = await self._video_workflow(comfy, store, slug, take)
+            if take.cancel_requested:
+                raise Cancelled
+            take.prompt_id = await comfy.queue_prompt(workflow)
+            status("rendering")
+
+        entry = await self._wait(comfy, take, take.prompt_id or "")
+        status("downloading")
+        take.files = await self._collect(comfy, entry, store.take_dir(slug, take.id))
+        if take.request.continues:
+            await self._measure_extension(store, slug, take)
+        take.error = None
+        self._finish(take, "done")
 
     async def _video_workflow(
         self, comfy: ComfyUI, store: ProjectStore, slug: str, take: Take
@@ -208,6 +274,9 @@ class Generator:
                 duration = fit_duration(seconds)
         take.duration_s = duration
         references: list[dict[str, Any]] = []
+        if req.continues:
+            clip = await self._continued_clip(store, slug, take)
+            references.append({"kind": "video", **await comfy.upload(clip, subfolder)})
         for kind, media_id in [
             *(("picture", m) for m in req.pictures),
             *([("audio", audio)] if audio else []),
@@ -225,6 +294,39 @@ class Generator:
             },
             run_id=take.id,
         )
+
+    async def _continued_clip(self, store: ProjectStore, slug: str, take: Take) -> Path:
+        """<Video 1> for an extension: the continued take's video, at 24 fps (ADR-0004).
+        A low-res extension comes back with that video stitched in front of the new part, so
+        its length is where the new part starts: the take's in-point."""
+        _, source = store.load(slug).find_take(take.request.continues or "")
+        if source.status != "done" or not source.video:
+            raise ComfyError("The take this shot continues has no finished video")
+        clip = store.take_dir(slug, source.id) / source.video
+        if source.upscaled:  # RIFE 48 fps
+            copy = store.take_dir(slug, take.id) / "continued-24fps.mp4"
+            if not copy.is_file():
+                await self.retime(clip, copy)
+            clip = copy
+        if not take.upscaled:
+            seconds = await self.probe(clip)
+            if seconds is None:
+                seconds = source.duration_s
+            if seconds is None:
+                raise ComfyError("Couldn't tell how long the continued take is; install ffmpeg")
+            take.play_from_s = round(seconds, 3)
+        return clip
+
+    async def _measure_extension(self, store: ProjectStore, slug: str, take: Take) -> None:
+        """A low-res extension's real length (the continued take plus the new part)."""
+        (store.take_dir(slug, take.id) / "continued-24fps.mp4").unlink(missing_ok=True)
+        if take.upscaled or not take.video:
+            return  # an upscaled extension is the new part only, rendered at its set length
+        seconds = await self.probe(store.take_dir(slug, take.id) / take.video)
+        if seconds is None and take.duration_s is not None:
+            seconds = (take.play_from_s or 0) + take.duration_s - EXTEND_OVERLAP_S
+        if seconds is not None:
+            take.duration_s = round(seconds, 3)
 
     async def _speak(self, comfy: ComfyUI, store: ProjectStore, slug: str, take: Take) -> str:
         """Say the line in the voice reference's voice; returns the spoken take's media id.

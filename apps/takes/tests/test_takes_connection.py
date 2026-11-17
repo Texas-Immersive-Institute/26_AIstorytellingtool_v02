@@ -2,7 +2,7 @@ import json
 
 import pytest
 from pydantic import ValidationError
-from takes_app.comfyui import check, outputs_of, run_error
+from takes_app.comfyui import ComfyUI, Progress, check, outputs_of, read_progress, run_error
 from takes_app.pack import Pack, PackError
 from takes_app.stages import (
     ASPECT_RATIOS,
@@ -36,6 +36,13 @@ def test_request_checks_inputs_against_toggles():
     GenerateRequest(prompt="p", pictures=["a"])
     GenerateRequest(prompt="p", frames="firstlast", pictures=["a", "b"])
     assert GenerateRequest(prompt="p", frames="none").stage == "video_1take_native_none"
+    ext = GenerateRequest(prompt="p", frames="none", continues="take_1")
+    assert ext.stage == "video_extend_native" and ext.media_ids() == []
+    assert ext.model_copy(update={"upscale": True}).stage == "video_extend_upscale_native"
+    with pytest.raises(ValidationError, match="takes no pictures"):
+        GenerateRequest(prompt="p", continues="take_1", pictures=["a"])
+    with pytest.raises(ValidationError, match="native audio only"):
+        GenerateRequest(prompt="p", continues="t", audio="clip", audio_clip="c", upscale=True)
     with pytest.raises(ValidationError, match="uses no pictures"):
         GenerateRequest(prompt="p", frames="none", pictures=["a"])
     with pytest.raises(ValidationError, match="first and a last frame"):
@@ -202,3 +209,66 @@ async def test_tells_another_comfyui_apart(fake_comfy):
 async def test_manual_address(fake_comfy):
     status = await check("http://10.0.0.5:8190/", transport=fake_comfy.transport)
     assert status.manual and status.url == "http://10.0.0.5:8190" and status.ready
+
+
+def test_progress_messages_are_read_for_our_runs_only():
+    runs = {"p1": {"7": "SamplerCustomAdvanced", "9": "VAEDecode"}}
+    read = lambda kind, **data: read_progress({"type": kind, "data": data}, runs)  # noqa: E731
+    assert read("executing", node="9", prompt_id="p1") == Progress("p1", "VAEDecode")
+    assert read("progress", node="7", value=4, max=6, prompt_id="p1") == Progress(
+        "p1", "SamplerCustomAdvanced", 4, 6
+    )
+    state = {"7": {"state": "running", "value": 2, "max": 6, "node_id": "7"}}
+    assert read("progress_state", prompt_id="p1", nodes=state) == Progress(
+        "p1", "SamplerCustomAdvanced", 2, 6
+    )
+    assert read("progress", node="7", value=1, max=6, prompt_id="someone-else") is None
+    assert read("executing", node=None, prompt_id="p1") is None  # the run finished
+    assert read_progress({"type": "status", "data": {"status": {}}}, runs) is None
+
+
+async def test_progress_comes_from_comfyuis_websocket():
+    import asyncio
+
+    from websockets.asyncio.server import serve
+
+    paths = []
+
+    async def comfy_ws(ws):
+        paths.append(ws.request.path)
+        await ws.send(b"\x00\x01preview image")
+        await ws.send(
+            json.dumps(
+                {"type": "progress", "data": {"prompt_id": "p1", "node": "7", "value": 3, "max": 6}}
+            )
+        )
+        await ws.send(
+            json.dumps(
+                {"type": "progress", "data": {"prompt_id": "p9", "node": "7", "value": 1, "max": 6}}
+            )
+        )
+        await asyncio.sleep(1)
+
+    async with serve(comfy_ws, "127.0.0.1", 0) as server:
+        port = server.sockets[0].getsockname()[1]
+        async with ComfyUI(f"http://127.0.0.1:{port}") as comfy:
+            comfy.runs["p1"] = {"7": "SamplerCustomAdvanced"}
+            seen, connected = [], asyncio.Event()
+            task = asyncio.create_task(comfy.watch(seen.append, connected))
+            await asyncio.wait_for(connected.wait(), 5)
+            for _ in range(50):
+                if seen:
+                    break
+                await asyncio.sleep(0.02)
+            task.cancel()
+    assert paths == [f"/ws?clientId={comfy.client_id}"]
+    assert seen == [Progress("p1", "SamplerCustomAdvanced", 3, 6)]
+
+
+async def test_no_websocket_means_no_progress_not_a_failure():
+    import asyncio
+
+    async with ComfyUI("http://127.0.0.1:9") as comfy:  # nothing listens on port 9
+        connected = asyncio.Event()
+        await asyncio.wait_for(comfy.watch(lambda p: None, connected), 10)
+        assert connected.is_set()

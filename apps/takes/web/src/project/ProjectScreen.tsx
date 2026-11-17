@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type GenerateRequest, type Options, type Project, type Take } from "../api";
 import { ComfyBadge, useComfy } from "../ComfyBadge";
 import { go } from "../route";
-import { draftFor, isUnfinished, reuse, takeLabel } from "./defaults";
+import { continuedFrom, draftFor, isUnfinished, reuse, takeLabel } from "./defaults";
 import { GenerateForm } from "./GenerateForm";
 import { ShotList } from "./ShotList";
 import { TakeList, type TakeActions } from "./TakeList";
@@ -69,8 +69,19 @@ export function ProjectScreen({ slug, shotId }: { slug: string; shotId: string |
     remove: (t: Take) => {
       if (shot && confirm(`Delete ${takeLabel(shot, t)} and its files?`)) run(() => api.deleteTake(slug, t.id));
     },
-    reuse: (t) => setDraft(reuse(t)),
+    reuse: (t) => setDraft({ ...reuse(t), continues: shot?.continues_take ?? null }),
+    extend: async (t) => {
+      setError(null);
+      try {
+        const made = await api.extend(slug, t.id);
+        await load();
+        open(made.id);
+      } catch (err) {
+        setError((err as Error).message);
+      }
+    },
   };
+  const continued = shot ? continuedFrom(project.shots, shot) : null;
 
   async function addShot(after: string | null = null) {
     setError(null);
@@ -110,6 +121,13 @@ export function ProjectScreen({ slug, shotId }: { slug: string; shotId: string |
           </span>
         )}
         <ComfyBadge status={comfy} />
+        <a
+          className="button primary"
+          href={`#/sequence/${encodeURIComponent(slug)}`}
+          title="Play each shot's selected take, back to back"
+        >
+          ▶ Play sequence
+        </a>
         <a className="button" href="#/settings">
           Settings
         </a>
@@ -141,6 +159,12 @@ export function ProjectScreen({ slug, shotId }: { slug: string; shotId: string |
                 slug={slug}
                 options={options}
                 draft={draft}
+                continued={
+                  continued && {
+                    label: `Shot ${continued.number} · ${continued.shot.title} · ${takeLabel(continued.shot, continued.take)}`,
+                    shotId: continued.shot.id,
+                  }
+                }
                 onChange={setDraft}
                 comfyReady={comfy?.ready ?? false}
                 onGenerate={async (req) => {

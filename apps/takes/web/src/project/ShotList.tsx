@@ -64,7 +64,10 @@ export function ShotList({
             >
               <span className="num">{i + 1}</span>
               <span className="shot-text">
-                <span className="shot-title">{shot.title}</span>
+                <span className="shot-title">
+                  {shot.continues_take && <span title="Continues the shot before it">↪ </span>}
+                  {shot.title}
+                </span>
                 <span className="shot-meta">
                   {shot.takes.length === 0
                     ? "No takes yet"

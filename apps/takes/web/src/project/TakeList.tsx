@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { videoUrl, type Shot, type Take } from "../api";
-import { AUDIO_LABEL, FRAMES_LABEL, STATUS_LABEL, clock, isUnfinished, takeLabel } from "./defaults";
+import { AUDIO_LABEL, FRAMES_LABEL, STATUS_LABEL, clock, isUnfinished, progressLabel, takeLabel } from "./defaults";
 
 export interface TakeActions {
   select: (t: Take) => void;
@@ -8,6 +8,7 @@ export interface TakeActions {
   cancel: (t: Take) => void;
   remove: (t: Take) => void;
   reuse: (t: Take) => void;
+  extend: (t: Take) => void;
 }
 
 /** The shot's player (the selected take unless you pick another to watch) and its takes, newest first. */
@@ -25,10 +26,21 @@ export function TakeList({ slug, shot, actions }: { slug: string; shot: Shot; ac
       <div className="player">
         {playing ? (
           <>
-            <video key={playing.id} src={videoUrl(slug, playing.id)} controls playsInline preload="metadata" />
+            <video
+              key={playing.id}
+              src={videoUrl(slug, playing.id) + (playing.play_from_s ? `#t=${playing.play_from_s}` : "")}
+              controls
+              playsInline
+              preload="metadata"
+            />
             <p className="player-caption">
               {takeLabel(shot, playing)}
               {playing.upscaled && <span className="badge up">⬆ Upscaled</span>}
+              {playing.play_from_s ? (
+                <span className="badge" title="This take holds the shot it continues; the sequence plays it from here">
+                  plays from {clock(playing.play_from_s)}
+                </span>
+              ) : null}
               {playing.id === shot.selected_take ? (
                 <span className="badge sel">★ Plays in the sequence</span>
               ) : (
@@ -104,14 +116,29 @@ function TakeRow({
         {r.prompt}
       </p>
       <p className="take-meta">
-        {FRAMES_LABEL[r.frames]} · {AUDIO_LABEL[r.audio]}
+        {r.continues ? "Extension" : FRAMES_LABEL[r.frames]} · {AUDIO_LABEL[r.audio]}
         {take.duration_s ? ` · ${take.duration_s} s` : ""} · {r.aspect_ratio.replace(/ \(.*\)$/, "")}
         {take.seed !== null && ` · seed ${take.seed}`}
       </p>
+      {unfinished && take.progress && (
+        <div className="take-progress" title={take.progress.node ?? undefined}>
+          <span>{progressLabel(take.progress)}</span>
+          {take.progress.step != null && take.progress.steps ? (
+            <progress value={take.progress.step} max={take.progress.steps} />
+          ) : null}
+        </div>
+      )}
       {take.error && <p className="error small">{take.error}</p>}
       <div className="take-actions">
         {take.status === "done" && !selected && <button onClick={() => actions.select(take)}>★ Select</button>}
-        {take.status === "done" && !take.upscaled && <button onClick={() => actions.upscale(take)}>⬆ Upscale this take</button>}
+        {take.status === "done" && !take.upscaled && !(r.continues && r.audio !== "native") && (
+          <button onClick={() => actions.upscale(take)}>⬆ Upscale this take</button>
+        )}
+        {take.status === "done" && selected && (
+          <button onClick={() => actions.extend(take)} title="Carry on from the end of this take in a new shot">
+            ⏩ Extend
+          </button>
+        )}
         {!take.source_take && <button onClick={() => actions.reuse(take)}>Reuse settings</button>}
         {unfinished && !take.cancel_requested && <button onClick={() => actions.cancel(take)}>Cancel</button>}
         {!unfinished && (

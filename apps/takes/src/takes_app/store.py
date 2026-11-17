@@ -53,6 +53,14 @@ class TakeFile(BaseModel):
     main: bool = False  # the take itself (the final video), not a preview or side file
 
 
+class RenderProgress(BaseModel):
+    """What ComfyUI is doing for a take right now (from its websocket); cleared when it ends."""
+
+    node: str | None = None  # the node type running
+    step: int | None = None
+    steps: int | None = None
+
+
 class Take(BaseModel):
     """One generated video for a shot, from the moment it is asked for."""
 
@@ -65,12 +73,16 @@ class Take(BaseModel):
     source_take: str | None = None  # for an upscaled take: the take it re-renders
     voice_audio: str | None = None  # media id of the line spoken from the voice reference
     duration_s: float | None = None  # the length it was rendered at
+    # Where this take's own part starts. A low-res extension holds its source take plus the new
+    # part, so it plays from here (ADR-0004); None plays the whole file.
+    play_from_s: float | None = None
     prompt_id: str | None = None  # ComfyUI's id for the video run
     error: str | None = None
     files: list[TakeFile] = Field(default_factory=list)
     created_at: str = Field(default_factory=now)
     finished_at: str | None = None
     cancel_requested: bool = False
+    progress: RenderProgress | None = None
 
     @property
     def video(self) -> str | None:
@@ -83,6 +95,8 @@ class Shot(BaseModel):
     notes: str = ""
     takes: list[Take] = Field(default_factory=list)
     selected_take: str | None = None
+    # A continuation shot: the take it extends (glossary: Continuation shot). None for others.
+    continues_take: str | None = None
 
     def take(self, take_id: str) -> Take:
         found = next((t for t in self.takes if t.id == take_id), None)
@@ -112,6 +126,10 @@ class Project(BaseModel):
         if found is None:
             raise NotFound(f"No shot {shot_id!r} in this project")
         return found
+
+    def continued_by(self, take_id: str) -> Shot | None:
+        """The continuation shot that extends this take, if any."""
+        return next((s for s in self.shots if s.continues_take == take_id), None)
 
     def find_take(self, take_id: str) -> tuple[Shot, Take]:
         for shot in self.shots:

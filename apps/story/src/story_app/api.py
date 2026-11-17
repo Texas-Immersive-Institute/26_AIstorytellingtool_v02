@@ -12,9 +12,9 @@ from typing import Any, Literal
 from aistory_core.ai import AiError, AiSettings, Backend, ask_json, check_all, choose_backend
 from aistory_core.embeddings import DEFAULT_MODEL_MB, EmbeddingModel
 from aistory_core.paths import suggested_projects_dir
+from aistory_core.web_ui import UIFiles
 from fastapi import APIRouter, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from story_app import __version__
@@ -373,5 +373,5 @@ def create_app(
 
     dist = Path(os.environ.get("STORY_WEB_DIST", APP_DIR / "web" / "dist"))
     if (dist / "index.html").is_file():
-        app.mount("/", StaticFiles(directory=dist, html=True), name="web")
+        app.mount("/", UIFiles(dist), name="web")
     return app

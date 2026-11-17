@@ -23,6 +23,16 @@ async def six_point_two(_path):
     return 6.2  # what ffprobe would say a sound file lasts
 
 
+RETIMED: list[tuple[str, str]] = []
+
+
+async def fake_retime(src, dest):
+    """Stands in for ffmpeg's 24 fps copy."""
+    RETIMED.append((src.name, dest.name))
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(b"24 fps copy")
+
+
 @pytest.fixture
 def projects(tmp_path):
     return tmp_path / "projects"
@@ -30,7 +40,13 @@ def projects(tmp_path):
 
 def make_client(fake_comfy, projects_dir):
     settings = AppSettings(projects_dir=str(projects_dir) if projects_dir else None)
-    app = create_app(settings, transport=fake_comfy.transport, poll_s=0.01, probe=six_point_two)
+    app = create_app(
+        settings,
+        transport=fake_comfy.transport,
+        poll_s=0.01,
+        probe=six_point_two,
+        retime=fake_retime,
+    )
     return TestClient(app)
 
 
@@ -272,6 +288,82 @@ def test_no_picture_runs_on_the_prompt_alone(client, shot, fake_comfy):
         node_input(fake_comfy.prompts[voiced["prompt_id"]], "references", voiced["stage"])
     )
     assert [r["kind"] for r in refs] == ["audio"]
+
+
+def test_extend_makes_a_continuation_shot_that_plays_from_the_new_part(
+    client, shot, fake_comfy, projects
+):
+    slug, shot_id = shot
+    source = wait_for(
+        client, slug, generate(client, slug, shot_id, pictures=[upload(client, slug)])
+    )
+
+    res = client.post(f"/api/projects/{slug}/takes/{source['id']}/extend")
+    assert res.status_code == 201, res.text
+    cont = res.json()
+    assert cont["title"] == "Lamp (continued)" and cont["continues_take"] == source["id"]
+    assert [s["id"] for s in project(client, slug)["shots"]] == [shot_id, cont["id"]]
+    again = client.post(f"/api/projects/{slug}/takes/{source['id']}/extend").json()
+    assert again["id"] == cont["id"]  # one continuation per take
+
+    # a continuation shot's takes must say which take they continue, and take no pictures
+    url = f"/api/projects/{slug}/shots/{cont['id']}/takes"
+    assert client.post(url, json={"prompt": "p", "frames": "none"}).status_code == 400
+    assert client.post(f"/api/projects/{slug}/shots/{shot_id}/takes", json={
+        "prompt": "p", "frames": "none", "continues": source["id"]
+    }).status_code == 400  # fmt: skip
+
+    ext = wait_for(client, slug, generate(
+        client, slug, cont["id"], frames="none", continues=source["id"], duration_s=8.0
+    ))  # fmt: skip
+    assert ext["status"] == "done", ext
+    assert ext["stage"] == "video_extend_native"
+    assert fake_comfy.uploads[-1] == ("final_00001-audio.mp4", "minimax_h3")
+    refs = json.loads(node_input(fake_comfy.prompts[ext["prompt_id"]], "references", ext["stage"]))
+    assert [r["kind"] for r in refs] == ["video"]
+    # the stitched result plays from where the new part starts: the continued take's length
+    assert ext["play_from_s"] == 6.2 and ext["duration_s"] == 6.2
+    assert take_of(client, slug, ext["id"])[0]["selected_take"] == ext["id"]
+
+    # upscaling an extension renders the new part only, on the same seed, and plays it whole
+    up = wait_for(
+        client, slug, client.post(f"/api/projects/{slug}/takes/{ext['id']}/upscale").json()["id"]
+    )
+    assert up["status"] == "done" and up["stage"] == "video_extend_upscale_native"
+    assert up["play_from_s"] is None and up["seed"] == ext["seed"]
+    assert take_of(client, slug, up["id"])[0]["selected_take"] == up["id"]
+    assert RETIMED == []
+
+    # extending an upscaled (48 fps) take sends H3 a 24 fps copy, removed afterwards
+    cont2 = client.post(f"/api/projects/{slug}/takes/{up['id']}/extend").json()
+    ext2 = wait_for(client, slug, generate(
+        client, slug, cont2["id"], frames="none", continues=up["id"]
+    ))  # fmt: skip
+    assert ext2["status"] == "done", ext2
+    assert RETIMED[-1] == ("final_00001-audio.mp4", "continued-24fps.mp4")
+    assert fake_comfy.uploads[-1] == ("continued-24fps.mp4", "minimax_h3")
+    assert not (projects / slug / "takes" / ext2["id"] / "continued-24fps.mp4").exists()
+    order = [s["id"] for s in project(client, slug)["shots"]]
+    assert order == [shot_id, cont["id"], cont2["id"]]
+
+    # what a continuation depends on can't be deleted from under it
+    assert client.delete(f"/api/projects/{slug}/takes/{source['id']}").status_code == 409
+    assert client.delete(f"/api/projects/{slug}/shots/{shot_id}").status_code == 409
+    assert client.delete(f"/api/projects/{slug}/shots/{cont2['id']}").status_code == 204
+
+
+def test_extensions_with_your_audio_are_not_upscaled(client, shot):
+    slug, shot_id = shot
+    source = wait_for(client, slug, generate(client, slug, shot_id, frames="none"))
+    cont = client.post(f"/api/projects/{slug}/takes/{source['id']}/extend").json()
+    clip = upload(client, slug, "line.mp3", b"mp3")
+    ext = wait_for(client, slug, generate(
+        client, slug, cont["id"], frames="none", continues=source["id"], audio="clip",
+        audio_clip=clip,
+    ))  # fmt: skip
+    assert ext["stage"] == "video_extend_audio" and ext["duration_s"] == 6.2
+    res = client.post(f"/api/projects/{slug}/takes/{ext['id']}/upscale")
+    assert res.status_code == 409 and "native audio only" in res.json()["detail"]
 
 
 def test_a_failed_run_reports_the_node_error(client, shot, fake_comfy):

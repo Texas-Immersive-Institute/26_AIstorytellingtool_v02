@@ -1,4 +1,5 @@
 import type { Story } from "./generated/story";
+import type { PlaythroughRecord } from "./run/replayState";
 import type { PlaythroughSummary, RunMemory, RunMessage, RunSnapshot } from "./run/types";
 
 export type { Story };
@@ -133,6 +134,8 @@ export const api = {
   startRun: (slug: string, mode: "live" | "outline_only") =>
     request<RunSnapshot>(`/projects/${encodeURIComponent(slug)}/playthroughs`, json("POST", { mode })),
   playthroughs: (slug: string) => request<PlaythroughSummary[]>(`/projects/${encodeURIComponent(slug)}/playthroughs`),
+  playthrough: (slug: string, id: string) =>
+    request<PlaythroughRecord>(`/projects/${encodeURIComponent(slug)}/playthroughs/${encodeURIComponent(id)}`),
   run: () => request<RunSnapshot>("/run"),
   stopRun: () => request<RunSnapshot>("/run/stop", { method: "POST" }),
   control: (action: string, extra: { seconds?: number; option_id?: string } = {}) =>

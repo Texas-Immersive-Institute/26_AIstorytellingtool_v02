@@ -11,6 +11,7 @@ dependencies = [
     "pydantic>=2.9.0",
     "python-multipart>=0.0.12",
     "pywebview>=5.0",
+    "websockets>=13.0",  # render progress from ComfyUI
 ]
 
 [project.scripts]

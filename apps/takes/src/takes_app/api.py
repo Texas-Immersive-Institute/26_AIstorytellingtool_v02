@@ -15,14 +15,14 @@ from typing import Any
 
 import httpx
 from aistory_core.paths import suggested_projects_dir
+from aistory_core.web_ui import UIFiles
 from fastapi import APIRouter, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from takes_app import __version__
 from takes_app.comfyui import DEFAULT_URL, ComfyStatus, ComfyUI, check
-from takes_app.generator import Generator, probe_seconds
+from takes_app.generator import Generator, probe_seconds, to_24fps
 from takes_app.pack import Pack, PackError
 from takes_app.settings import AppSettings, save_settings
 from takes_app.stages import ASPECT_RATIOS, DURATIONS, GenerateRequest
@@ -94,8 +94,9 @@ def create_app(
     transport: httpx.AsyncBaseTransport | None = None,
     poll_s: float = 5.0,
     probe=probe_seconds,
+    retime=to_24fps,
 ) -> FastAPI:
-    """`transport` and `probe` let tests stand in for ComfyUI and ffprobe."""
+    """`transport`, `probe` and `retime` let tests stand in for ComfyUI, ffprobe and ffmpeg."""
     stores: dict[str, ProjectStore] = {}
 
     def store() -> ProjectStore:
@@ -111,8 +112,10 @@ def create_app(
         store=store,
         pack=pack,
         connect=connect,
-        make_comfy=lambda url: ComfyUI(url, transport=transport),
+        # A stand-in ComfyUI (tests) has no websocket to watch.
+        make_comfy=lambda url: ComfyUI(url, transport=transport, watch_progress=transport is None),
         probe=probe,
+        retime=retime,
         poll_s=poll_s,
     )
 
@@ -263,6 +266,12 @@ def create_app(
         if any(t.status in UNFINISHED for t in shot.takes):
             raise HTTPException(409, "Cancel this shot's waiting or rendering takes first")
         for take in shot.takes:
+            continuation = project.continued_by(take.id)
+            if continuation:
+                raise HTTPException(
+                    409, f"“{continuation.title}” continues this shot; delete that shot first"
+                )
+        for take in shot.takes:
             store().delete_take_files(slug, take.id)
         project.shots.remove(shot)
         store().save(slug)
@@ -272,11 +281,22 @@ def create_app(
     def check_inputs(slug: str, request: GenerateRequest) -> None:
         for media_id in request.media_ids():
             store().media_path(slug, media_id)
+        if request.continues:
+            _, source = store().load(slug).find_take(request.continues)
+            if source.status != "done":
+                raise HTTPException(409, "Only a finished take can be extended")
         pack.stage(request.stage)
 
     @api.post("/projects/{slug}/shots/{shot_id}/takes", response_model=Take, status_code=202)
     async def generate(slug: str, shot_id: str, body: GenerateRequest) -> Take:
         shot = store().load(slug).shot(shot_id)
+        if body.continues != shot.continues_take:
+            raise HTTPException(
+                400,
+                f"This shot continues take {shot.continues_take}; send it as 'continues'"
+                if shot.continues_take
+                else "Only a continuation shot extends a take; use Extend on the take first",
+            )
         check_inputs(slug, body)
         take = Take(request=body, stage=body.stage, upscaled=body.upscale)
         shot.takes.append(take)
@@ -290,6 +310,12 @@ def create_app(
         shot, source = store().load(slug).find_take(take_id)
         if source.status != "done" or source.upscaled:
             raise HTTPException(409, "Only a finished take that isn't upscaled yet can be upscaled")
+        if source.request.continues and source.request.audio != "native":
+            raise HTTPException(
+                409,
+                "An extension with your clip or a voice reference can't be upscaled: the pack's "
+                "extend + upscale stage has native audio only",
+            )
         changes: dict[str, Any] = {"upscale": True, "seed": source.seed}
         if source.request.audio == "voice":
             # Reuse the line already spoken, so the upscale has the same soundtrack.
@@ -307,6 +333,21 @@ def create_app(
         store().save(slug)
         generator.enqueue(slug, take.id)
         return take
+
+    @api.post("/projects/{slug}/takes/{take_id}/extend", response_model=Shot, status_code=201)
+    async def extend_take(slug: str, take_id: str) -> Shot:
+        """A continuation shot right after this take's shot, carrying on from this take."""
+        project = store().load(slug)
+        shot, take = project.find_take(take_id)
+        if take.status != "done" or not take.video:
+            raise HTTPException(409, "Only a finished take can be extended")
+        existing = project.continued_by(take.id)
+        if existing:
+            return existing
+        new = Shot(title=f"{shot.title} (continued)", continues_take=take.id)
+        project.shots.insert(project.shots.index(shot) + 1, new)
+        store().save(slug)
+        return new
 
     @api.post("/projects/{slug}/takes/{take_id}/select", response_model=Shot)
     async def select_take(slug: str, take_id: str) -> Shot:
@@ -326,6 +367,11 @@ def create_app(
         shot, take = store().load(slug).find_take(take_id)
         if take.status in UNFINISHED:
             raise HTTPException(409, "Cancel this take before deleting it")
+        continuation = store().load(slug).continued_by(take.id)
+        if continuation:
+            raise HTTPException(
+                409, f"“{continuation.title}” continues this take; delete that shot first"
+            )
         shot.takes.remove(take)
         store().delete_take_files(slug, take.id)
         if shot.selected_take == take.id:
@@ -369,5 +415,5 @@ def create_app(
     # The UI (apps/takes/web, built with `npm run build`), when it has been built.
     dist = Path(os.environ.get("TAKES_WEB_DIST", APP_DIR / "web" / "dist"))
     if (dist / "index.html").is_file():
-        app.mount("/", StaticFiles(directory=dist, html=True), name="web")
+        app.mount("/", UIFiles(dist), name="web")
     return app

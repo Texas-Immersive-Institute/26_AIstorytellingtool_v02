@@ -59,12 +59,19 @@ export interface GenerateRequest {
   duration_s: number;
   aspect_ratio: string;
   seed: number | null;
+  continues?: string | null; // a continuation shot's take: the take it extends
 }
 
 export interface TakeFile {
   name: string;
   size: number;
   main: boolean;
+}
+
+export interface RenderProgress {
+  node: string | null; // the ComfyUI node type running now
+  step: number | null;
+  steps: number | null;
 }
 
 export interface Take {
@@ -77,12 +84,14 @@ export interface Take {
   source_take: string | null;
   voice_audio: string | null;
   duration_s: number | null;
+  play_from_s?: number | null;
   prompt_id: string | null;
   error: string | null;
   files: TakeFile[];
   created_at: string;
   finished_at: string | null;
   cancel_requested: boolean;
+  progress?: RenderProgress | null;
 }
 
 export interface Shot {
@@ -91,6 +100,7 @@ export interface Shot {
   notes: string;
   takes: Take[];
   selected_take: string | null;
+  continues_take?: string | null; // a continuation shot: the take it extends
 }
 
 export interface Project {
@@ -189,6 +199,7 @@ export const api = {
   generate: (slug: string, shot: string, body: GenerateRequest) =>
     request<Take>(`${p(slug)}/shots/${encodeURIComponent(shot)}/takes`, json("POST", body)),
   upscale: (slug: string, take: string) => request<Take>(`${p(slug)}/takes/${encodeURIComponent(take)}/upscale`, post),
+  extend: (slug: string, take: string) => request<Shot>(`${p(slug)}/takes/${encodeURIComponent(take)}/extend`, post),
   select: (slug: string, take: string) => request<Shot>(`${p(slug)}/takes/${encodeURIComponent(take)}/select`, post),
   cancel: (slug: string, take: string) => request<Take>(`${p(slug)}/takes/${encodeURIComponent(take)}/cancel`, post),
   deleteTake: (slug: string, take: string) =>

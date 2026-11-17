@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, type SettingsOut } from "./api";
 import { ProjectScreen } from "./project/ProjectScreen";
+import { SequenceScreen } from "./project/SequenceScreen";
 import { useRoute } from "./route";
 import { Projects } from "./screens/Projects";
 import { Settings } from "./screens/Settings";
@@ -22,6 +23,7 @@ export default function App() {
   if (!settings) return <div className="centered">Loading…</div>;
   if (!settings.projects_dir) return <Setup settings={settings} onSaved={setSettings} />;
   if (route.name === "settings") return <Settings settings={settings} onSaved={setSettings} />;
+  if (route.name === "sequence") return <SequenceScreen key={route.slug} slug={route.slug} />;
   if (route.name === "project") return <ProjectScreen key={route.slug} slug={route.slug} shotId={route.shot} />;
   return <Projects settings={settings} />;
 }

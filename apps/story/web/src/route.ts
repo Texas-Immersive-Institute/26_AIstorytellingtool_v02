@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
  *   #/settings               AI, matching, LAN and folder settings
  *   #/project/<slug>         editor
  *   #/project/<slug>/run     Debug view (operator)
+ *   #/project/<slug>/replay/<playthrough id>   step through a saved playthrough
  *   #/stage                  Stage view (the big screen)
  *   #/chat                   Chat view (audience devices)
  */
@@ -14,12 +15,14 @@ export type Route =
   | { name: "settings" }
   | { name: "project"; slug: string }
   | { name: "run"; slug: string }
+  | { name: "replay"; slug: string; playthrough: string }
   | { name: "stage" }
   | { name: "chat" };
 
 export function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
   if (parts[0] === "project" && parts[1]) {
+    if (parts[2] === "replay" && parts[3]) return { name: "replay", slug: parts[1], playthrough: parts[3] };
     return parts[2] === "run" ? { name: "run", slug: parts[1] } : { name: "project", slug: parts[1] };
   }
   if (parts[0] === "chat") return { name: "chat" };
@@ -34,6 +37,8 @@ export function href(route: Route): string {
       return `#/project/${encodeURIComponent(route.slug)}`;
     case "run":
       return `#/project/${encodeURIComponent(route.slug)}/run`;
+    case "replay":
+      return `#/project/${encodeURIComponent(route.slug)}/replay/${encodeURIComponent(route.playthrough)}`;
     case "chat":
     case "stage":
     case "settings":

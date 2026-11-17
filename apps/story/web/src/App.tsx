@@ -3,6 +3,7 @@ import { api, type SettingsOut } from "./api";
 import { Chat } from "./chat/Chat";
 import { Editor } from "./editor/Editor";
 import { useRoute } from "./route";
+import { Replay } from "./run/Replay";
 import { Runner } from "./run/Runner";
 import { StageView } from "./run/StageView";
 import { Projects } from "./screens/Projects";
@@ -36,6 +37,7 @@ export default function App() {
   if (route.name === "settings") return <Settings settings={settings} onChangeFolder={changeFolder} />;
   if (route.name === "project") return <Editor key={route.slug} slug={route.slug} />;
   if (route.name === "run") return <Runner key={route.slug} slug={route.slug} />;
+  if (route.name === "replay") return <Replay key={route.playthrough} slug={route.slug} playthrough={route.playthrough} />;
   return <Projects settings={settings} onChangeFolder={changeFolder} />;
 }
 

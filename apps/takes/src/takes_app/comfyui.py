@@ -1,15 +1,24 @@
 """Talks to ComfyUI directly over its HTTP API (ADR-0006). Takes expects ComfyUI to be running
 already, on 127.0.0.1:8188 unless settings say otherwise; it never starts ComfyUI itself.
+Progress while a run renders comes from ComfyUI's websocket, when it can be reached.
 """
 
 from __future__ import annotations
 
+import asyncio
+import json
+import logging
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import httpx
+from websockets.asyncio.client import connect as ws_connect
+from websockets.exceptions import WebSocketException
+
+log = logging.getLogger(__name__)
 
 DEFAULT_URL = "http://127.0.0.1:8188"
 # A node the H3 workflows use; if ComfyUI doesn't know it, this isn't the H3 ComfyUI.
@@ -31,9 +40,13 @@ class ComfyUI:
         *,
         transport: httpx.AsyncBaseTransport | None = None,
         timeout: float = 30.0,
+        watch_progress: bool = True,
     ):
         self.base_url = base_url.rstrip("/")
         self.client_id = uuid.uuid4().hex
+        self.watch_progress = watch_progress
+        # prompt id -> {node id: node type} for the runs this client queued (for progress)
+        self.runs: dict[str, dict[str, str]] = {}
         self._http = httpx.AsyncClient(base_url=self.base_url, transport=transport, timeout=timeout)
 
     async def __aenter__(self) -> ComfyUI:
@@ -88,7 +101,45 @@ class ComfyUI:
             )
         if not body.get("prompt_id"):
             raise ComfyError(f"ComfyUI didn't return a prompt id: {body}")
-        return str(body["prompt_id"])
+        prompt_id = str(body["prompt_id"])
+        self.runs[prompt_id] = {
+            str(nid): str(node.get("class_type") or nid)
+            for nid, node in workflow.items()
+            if isinstance(node, dict)
+        }
+        return prompt_id
+
+    def track(self, prompt_id: str) -> None:
+        """Follow the progress of a run queued earlier (node types unknown)."""
+        self.runs.setdefault(prompt_id, {})
+
+    async def watch(
+        self, on_progress: Callable[[Progress], None], connected: asyncio.Event
+    ) -> None:
+        """Report progress of this client's runs until cancelled; `connected` is set once the
+        websocket is open, or as soon as it can't be. Progress is a nicety: failures are quiet."""
+        if not self.watch_progress:
+            connected.set()
+            return
+        scheme, rest = self.base_url.split("://", 1)
+        url = f"{'wss' if scheme == 'https' else 'ws'}://{rest}/ws?clientId={self.client_id}"
+        try:
+            async with ws_connect(url, open_timeout=5, max_size=None) as ws:
+                connected.set()
+                async for raw in ws:
+                    if not isinstance(raw, str):
+                        continue  # binary frames are preview images
+                    try:
+                        message = json.loads(raw)
+                    except ValueError:
+                        continue
+                    progress = read_progress(message, self.runs)
+                    if progress:
+                        on_progress(progress)
+        except (OSError, WebSocketException, TimeoutError) as exc:
+            log.info("No progress from ComfyUI's websocket at %s: %s", url, exc)
+        finally:
+            connected.set()
 
     async def history(self, prompt_id: str) -> dict[str, Any] | None:
         """The finished run's record, or None while it is still queued or running."""
@@ -143,6 +194,53 @@ class ComfyUI:
             raise
         tmp.replace(dest)
         return size
+
+
+@dataclass
+class Progress:
+    """Where a run is: the node running now (its type) and, while it counts, its step."""
+
+    prompt_id: str
+    node: str | None
+    step: int | None = None
+    steps: int | None = None
+
+
+def read_progress(message: Any, runs: dict[str, dict[str, str]]) -> Progress | None:
+    """What a websocket message says about one of `runs`, or None if it says nothing."""
+    if not isinstance(message, dict) or not isinstance(message.get("data"), dict):
+        return None
+    kind, data = message.get("type"), message["data"]
+    prompt_id = str(data.get("prompt_id") or "")
+    if prompt_id not in runs:
+        return None
+    names = runs[prompt_id]
+
+    def name(node: Any) -> str | None:
+        return None if node is None else names.get(str(node), str(node))
+
+    if kind == "executing":
+        node = data.get("display_node") or data.get("node")
+        return None if node is None else Progress(prompt_id, name(node))
+    if kind == "progress":
+        return Progress(
+            prompt_id, name(data.get("node")), _int(data.get("value")), _int(data.get("max"))
+        )
+    if kind == "progress_state":  # newer ComfyUI: every node's state at once
+        for node_id, state in (data.get("nodes") or {}).items():
+            if isinstance(state, dict) and state.get("state") == "running":
+                node = state.get("display_node_id") or state.get("node_id") or node_id
+                return Progress(
+                    prompt_id, name(node), _int(state.get("value")), _int(state.get("max"))
+                )
+    return None
+
+
+def _int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def outputs_of(entry: dict[str, Any]) -> list[dict[str, Any]]:

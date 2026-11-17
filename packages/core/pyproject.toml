@@ -1,12 +1,13 @@
 [project]
 name = "aistory-core"
 version = "0.1.0"
-description = "Shared code for the Story and Takes apps: app data paths, settings files, host/LAN access checks"
+description = "Shared code for the Story and Takes apps: app data paths, settings files, host/LAN access checks, serving the built UI"
 requires-python = ">=3.11"
 dependencies = [
     "fastembed>=0.5.0",
     "httpx>=0.28.0",
     "pydantic>=2.9.0",
+    "starlette>=0.40.0",
 ]
 
 [build-system]

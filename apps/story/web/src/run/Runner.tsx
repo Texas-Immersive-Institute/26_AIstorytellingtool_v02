@@ -77,7 +77,7 @@ export function Runner({ slug }: { slug: string }) {
           <Operator snap={snap} remaining={remaining()} act={act} />
         </div>
       ) : (
-        <SavedList saved={saved} />
+        <SavedList slug={slug} saved={saved} />
       )}
     </div>
   );
@@ -358,7 +358,7 @@ function JoinBar() {
   );
 }
 
-function SavedList({ saved }: { saved: PlaythroughSummary[] }) {
+function SavedList({ slug, saved }: { slug: string; saved: PlaythroughSummary[] }) {
   return (
     <div className="page">
       <h2>Saved playthroughs</h2>
@@ -373,21 +373,23 @@ function SavedList({ saved }: { saved: PlaythroughSummary[] }) {
                 {p.mode === "outline_only" ? "outline only" : "live"} · {p.messages} message(s) · {p.ended ? "finished" : "unfinished"}
               </span>
               <span className="small">{p.path.join(" → ")}</span>
+              <a className="button" href={href({ name: "replay", slug, playthrough: p.id })}>
+                Step through ▶
+              </a>
             </li>
           ))}
         </ul>
       )}
-      <p className="muted small">Stepping back through a saved playthrough comes in a later milestone.</p>
     </div>
   );
 }
 
-function recentlyChanged(events: RunEvent[] | undefined, name: string): boolean {
+export function recentlyChanged(events: RunEvent[] | undefined, name: string): boolean {
   const recent = (events ?? []).slice(-12);
   return recent.some((e) => e.type === "variable_changed" && e.name === name);
 }
 
-function describeEvent(e: RunEvent): string {
+export function describeEvent(e: RunEvent): string {
   switch (e.type) {
     case "scene_entered":
       return String(e.title);

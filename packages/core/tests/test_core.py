@@ -35,3 +35,17 @@ def test_settings_roundtrip(tmp_path: Path):
     save_model(path, Sample(name="y", count=3))
     assert load_model(path, Sample) == Sample(name="y", count=3)
     assert not list(tmp_path.glob(".config.json.*"))
+
+
+def test_ui_page_is_checked_again_on_every_load(tmp_path):
+    from aistory_core.web_ui import UIFiles
+    from starlette.applications import Starlette
+    from starlette.testclient import TestClient
+
+    (tmp_path / "index.html").write_text("<html></html>")
+    (tmp_path / "app-1a2b.js").write_text("x")
+    app = Starlette()
+    app.mount("/", UIFiles(tmp_path))
+    client = TestClient(app)
+    assert client.get("/").headers["cache-control"] == "no-cache"
+    assert "cache-control" not in client.get("/app-1a2b.js").headers

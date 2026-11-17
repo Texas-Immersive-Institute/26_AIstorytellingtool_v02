@@ -14,6 +14,8 @@ Frames = Literal["none", "first", "last", "firstlast"]
 Audio = Literal["native", "clip", "voice"]
 
 VOICE_STAGE = "voice_takes"
+# The extend stages continue <Video 1>; the new part overlaps its last frames by this much.
+EXTEND_OVERLAP_S = 22 / 24
 ASPECT_RATIOS = (
     "1:1 (Square)",
     "2:3 (Portrait Photo)",
@@ -50,6 +52,13 @@ def stage_for(frames: Frames, audio: Audio, upscale: bool) -> str:
     takes = "upscale" if upscale else "1take"
     sound = "native" if audio == "native" else "audio"
     return f"video_{takes}_{sound}_{frames}"
+
+
+def extend_stage_for(audio: Audio, upscale: bool) -> str:
+    """Continuing a take (a continuation shot). Upscaled extensions return the new part only."""
+    if upscale:
+        return "video_extend_upscale_native"
+    return "video_extend_native" if audio == "native" else "video_extend_audio"
 
 
 def pictures_needed(frames: Frames) -> int:
@@ -93,11 +102,24 @@ class GenerateRequest(BaseModel):
     duration_s: float = Field(default=6.58, ge=1, le=15)
     aspect_ratio: str = DEFAULT_ASPECT
     seed: int | None = Field(default=None, ge=0, le=1125899906842624)
+    # A continuation shot's take: the id of the take it extends (glossary: Continuation shot).
+    # Its video is <Video 1>; frames and pictures don't apply.
+    continues: str | None = None
 
     @model_validator(mode="after")
     def _inputs_match_toggles(self) -> GenerateRequest:
         need = pictures_needed(self.frames)
-        if len(self.pictures) != need:
+        if self.continues:
+            if self.pictures:
+                raise ValueError(
+                    "A continuation shot carries on from a video and takes no pictures"
+                )
+            if self.upscale and self.audio != "native":
+                raise ValueError(
+                    "An upscaled extension has native audio only; the pack has no extend + "
+                    "upscale stage for your clip or a voice reference"
+                )
+        elif len(self.pictures) != need:
             if need == 0:
                 raise ValueError("'No picture' uses no pictures; remove them or pick a frame mode")
             which = "a first and a last frame" if need == 2 else "one picture"
@@ -116,6 +138,8 @@ class GenerateRequest(BaseModel):
 
     @property
     def stage(self) -> str:
+        if self.continues:
+            return extend_stage_for(self.audio, self.upscale)
         return stage_for(self.frames, self.audio, self.upscale)
 
     def media_ids(self) -> list[str]:

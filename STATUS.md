@@ -4,9 +4,9 @@ _Last updated: 2026-11-17 by Claude Code_
 
 ## Current focus
 
-Story v1 milestones 1 to 6 are built: authoring, playthroughs, matching, AI backends, and the Stage, Chat and Debug views. Left for v1: milestone 7 (step through saved playthroughs, polish).
+Story v1 milestones 1 to 6 are built: authoring, playthroughs, matching, AI backends, and the Stage, Chat and Debug views. Milestone 7's stepping through saved playthroughs is built (2026-11-17); general polish is left.
 
-Takes has started (2026-11-13, user's call to begin it now): Takes talks to the H3 ComfyUI directly with its own copy of the H3 pack (user decision, ADR-0006). The connection, projects/shots/takes, the Takes UI and `start-takes.command` / `.bat` are built. Left: progress while rendering, extend, sequence playback.
+Takes has started (2026-11-13, user's call to begin it now): Takes talks to the H3 ComfyUI directly with its own copy of the H3 pack (user decision, ADR-0006). The connection, projects/shots/takes, the Takes UI, `start-takes.command` / `.bat`, no-picture takes, extend (continuation shots), sequence playback and render progress are built. The user reports Takes runs on the Windows PC with the H3 ComfyUI (2026-11-17). Left: real-render checks of the newest features. User direction (2026-11-17): add nothing new for now; Takes is the focus.
 
 ## Done
 
@@ -29,17 +29,21 @@ Takes has started (2026-11-13, user's call to begin it now): Takes talks to the 
 - [x] Python pinned to 3.14 with `.python-version` (2026-11-17): on a Windows PC `uv sync` picked Python 3.15, which onnxruntime 1.31.1 (needed by fastembed) has no packages for. Reproduced here with 3.15 and checked that `uv sync` replaces a 3.15 `.venv` with 3.14 once the pin is in place. Move the pin up when onnxruntime publishes 3.15 packages.
 
 - [x] Takes: no-picture takes (2026-11-17): a 'No picture' frame mode runs on the prompt alone (H3's T2VA format: no picture line, start with `integrated_multimodal_description:`). `Pack` builds `video_{1take,3takes,upscale}_{native,audio}_none` from each `*_first` stage by taking out the frame guide (`MiniMaxH3AddGuide`) and the picture resize that fed it; the pack files are unchanged. Works with native, your clip and voice reference audio, and with upscale this take. Also fixed the shot pane growing past the window under 1150 px when a take's prompt has a long word. 109 Python tests, ruff, 3 web tests and the build pass; in the browser a no-picture take was accepted as `video_1take_native_none` and failed cleanly because ComfyUI wasn't running. Not yet rendered by the real H3 ComfyUI.
+- [x] Takes: sequence playback (2026-11-17): "▶ Play sequence" opens `#/sequence/<slug>`, which plays each shot's finished selected take back to back (preloading the next), skips shots without one, starts a take at its in-point, and has previous/next, a shot strip, full screen and ← → / space / F keys. Checked in the browser with recorded test clips: order, skipping, in-point start, play again, jump from the strip.
+- [x] Takes: extend as continuation shots (2026-11-17, ADR-0004): "⏩ Extend" on a shot's selected take adds a continuation shot after it (`Shot.continues_take`; one per take). Its takes use `video_extend_native` / `video_extend_audio` with the take's video as `<Video 1>` (`GenerateRequest.continues`), any audio mode; the low-res result is stitched, so the take records `play_from_s` (the continued clip's length, from ffprobe) and its real length. "Upscale this take" on a native-audio extension uses `video_extend_upscale_native` (new part only). An upscaled (48 fps) source is copied to 24 fps with ffmpeg first. A take or shot that a continuation depends on can't be deleted. Tests cover a chain of extensions against the stand-in; in the browser an extend take was sent as `video_extend_native` (ComfyUI not running here).
+- [x] Takes: render progress (2026-11-17): while a take runs, Takes listens on ComfyUI's websocket (`/ws?clientId=`) and shows the running node and sampler step ("Sampling · step 4 of 6") with a bar; without a websocket it renders as before. Tested with a local websocket server and a faked rendering take in the browser; not yet seen against the real ComfyUI.
+- [x] Story: step through a saved playthrough (2026-11-17): "Step through ▶" on each saved playthrough opens `#/project/<slug>/replay/<id>`, rebuilding the Debug state at any event from the saved story and event log (`run/replayState.ts`): stage preview, windows with their saved totals, messages, variables, memory, live profiles, path; event-by-event, scene and window jumps, a scrubber and timed play. Checked in the browser on a simulated example playthrough; its end state matched the saved final state.
+- [x] Both apps serve `index.html` with `Cache-Control: no-cache` (`aistory_core.web_ui.UIFiles`), so a rebuilt UI loads instead of a cached old one.
+- Verified 2026-11-17: 115 Python tests, ruff, Story 18 and Takes 5 web tests, type checks and both production builds pass.
 
 ## Next
 
-- [ ] Takes: show progress while rendering (ComfyUI websocket)
-- [ ] Takes: extend as continuation shots (ADR-0004: in-point on the low-res take, 24 fps ffmpeg copy of an upscaled source)
-- [ ] Takes: back-to-back sequence playback
+- [ ] Takes on the Windows PC with the real H3 ComfyUI: extend a take (check the in-point lands where the new part starts), upscale an extension, extend an upscaled take (ffmpeg 24 fps copy), watch render progress, play a sequence
 - [ ] Run `install.bat` on the Windows PC (winget installs, PATH refresh, both UI builds)
 - [ ] Takes: render a no-picture take on the real H3 ComfyUI and check the prompt alone sets the scene (the Ref2VA model and the T2VA prompt format are the ones the extend stages already use)
 - [ ] Takes: try the UI against the real H3 ComfyUI on the Windows PC (generate, voice reference, upscale) via `start-takes.bat`
 
-- [ ] 7. Step through a saved playthrough in the Debug view; polish
+- [ ] 7. Polish (stepping through saved playthroughs is done)
 - [ ] Try it with real devices: run `start-story-lan.bat`, allow the firewall prompt on private networks, scan the QR code from a phone
 - [ ] Download the matching model from Settings and tune `SEMANTIC_LOW`/`SEMANTIC_HIGH` in `matching.py` against real chat
 - [ ] Optional: install Ollama and `ollama pull llama3.2:3b` for a free local backend; or run `claude auth login` to use the Claude CLI
@@ -58,4 +62,7 @@ Takes has started (2026-11-13, user's call to begin it now): Takes talks to the 
 - Beat timing ignores audio length (reading time only).
 - While a Story server is running, `uv sync` can't replace `storytool.exe`. Stop the server first. The server that was running at 7:06 PM predates these changes and needs a restart.
 - Takes UI not yet exercised against a real render, on Windows, or in the window with a mouse (drag-reorder was checked with synthetic drag events in the browser; closing the window should stop the server, unchecked). pywebview on Windows needs the WebView2 runtime (built into Windows 11); without it Takes opens in the browser.
-- Takes: upscaled extensions vs. low-res preview with the same seed is unverified; several H3 pack stages are marked "not run yet".
+- Takes: upscaled extensions vs. low-res preview with the same seed is unverified; several H3 pack stages are marked "not run yet", including `video_extend_audio`.
+- Takes extend: the in-point assumes the stitched video is the continued clip followed by the new part (length = clip + new part − 22-frame overlap). If H3 stitches differently, the sequence may repeat or skip up to about 0.9 s at the cut.
+- Takes progress: ComfyUI only sends progress to the client that queued the run, so a take resumed after Takes restarts shows no progress detail.
+- Story replay: choice totals are only known when a window closes; while a replayed window is open it shows the messages, not running totals.

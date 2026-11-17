@@ -6,15 +6,18 @@ import { useEffect, useState } from "react";
  *   #/settings                projects folder and ComfyUI address
  *   #/project/<slug>          a project's shots (the sequence)
  *   #/project/<slug>/<shot>   the same, with that shot open
+ *   #/sequence/<slug>         the selected takes played back to back
  */
 export type Route =
   | { name: "projects" }
   | { name: "settings" }
-  | { name: "project"; slug: string; shot: string | null };
+  | { name: "project"; slug: string; shot: string | null }
+  | { name: "sequence"; slug: string };
 
 export function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
   if (parts[0] === "project" && parts[1]) return { name: "project", slug: parts[1], shot: parts[2] ?? null };
+  if (parts[0] === "sequence" && parts[1]) return { name: "sequence", slug: parts[1] };
   if (parts[0] === "settings") return { name: "settings" };
   return { name: "projects" };
 }
@@ -23,6 +26,8 @@ export function href(route: Route): string {
   switch (route.name) {
     case "project":
       return `#/project/${encodeURIComponent(route.slug)}` + (route.shot ? `/${encodeURIComponent(route.shot)}` : "");
+    case "sequence":
+      return `#/sequence/${encodeURIComponent(route.slug)}`;
     case "settings":
       return "#/settings";
     default:

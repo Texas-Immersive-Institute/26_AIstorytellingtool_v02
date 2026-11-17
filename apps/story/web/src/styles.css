@@ -257,6 +257,17 @@ input.grow { flex: 1; }
 .vars tr.changed td { background: #3a3218; }
 .events { margin: 0; padding-left: 1.4rem; font-size: 0.78rem; max-height: 260px; overflow: auto; }
 .plain-list { list-style: none; padding: 0; display: grid; gap: 0.5rem; }
+.plain-list .card .button { align-self: flex-start; margin-top: 0.3rem; }
+
+/* stepping through a saved playthrough */
+.replay-bar { display: flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.replay-scrub { flex: 1; min-width: 160px; accent-color: var(--accent); }
+.replay-time { font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+.replay-events { max-height: 40vh; position: relative; }
+.replay-events li { cursor: pointer; border-radius: 4px; padding: 0 0.2rem; }
+.replay-events li:hover { background: var(--panel-2); }
+.replay-events li.on { background: #3a3218; }
+.replay-events li.later { opacity: 0.45; }
 
 /* pictures in slots and on scene boxes */
 .slot.drop { outline: 2px dashed var(--accent); outline-offset: 2px; border-radius: 6px; }
