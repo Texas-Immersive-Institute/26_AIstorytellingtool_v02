@@ -1,0 +1,41 @@
+[project]
+name = "aistory-workspace"
+version = "0.1.0"
+description = "Workspace root for the AI Storytelling Tool apps (Story, Takes) and their shared core"
+requires-python = ">=3.11"
+dependencies = ["aistory-core", "story-app", "takes-app"]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/core", "apps/story", "apps/takes"]
+
+[tool.uv.sources]
+aistory-core = { workspace = true }
+story-app = { workspace = true }
+takes-app = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.28.0",
+    "ruff>=0.8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["packages/core/tests", "apps/story/tests", "apps/takes/tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "--import-mode=importlib"
+pythonpath = ["apps/story/tests"]
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501", "B008", "SIM105", "SIM905", "UP042"]

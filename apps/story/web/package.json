@@ -1,0 +1,28 @@
+{
+  "name": "story-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "types": "uv run storytool schema src/generated/story.schema.json && json2ts -i src/generated/story.schema.json -o src/generated/story.ts --unreachableDefinitions --additionalProperties false"
+  },
+  "dependencies": {
+    "@xyflow/react": "^12.12.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "jsdom": "^31.0.0",
+    "json-schema-to-typescript": "^15.0.0",
+    "typescript": "~5.7.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

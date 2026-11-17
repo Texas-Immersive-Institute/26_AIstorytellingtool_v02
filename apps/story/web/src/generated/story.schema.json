@@ -1,0 +1,966 @@
+{
+  "$defs": {
+    "BaseProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "summary": {
+          "default": "",
+          "title": "Summary",
+          "type": "string"
+        },
+        "personality": {
+          "default": "",
+          "title": "Personality",
+          "type": "string"
+        },
+        "motivations": {
+          "default": "",
+          "title": "Motivations",
+          "type": "string"
+        },
+        "speaking_style": {
+          "default": "",
+          "title": "Speaking Style",
+          "type": "string"
+        },
+        "knows": {
+          "default": "",
+          "title": "Knows",
+          "type": "string"
+        },
+        "hides": {
+          "default": "",
+          "title": "Hides",
+          "type": "string"
+        }
+      },
+      "required": [
+        "summary",
+        "personality",
+        "motivations",
+        "speaking_style",
+        "knows",
+        "hides"
+      ],
+      "title": "BaseProfile",
+      "type": "object"
+    },
+    "Beat": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "beat",
+          "default": "beat",
+          "title": "Kind",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "default": "",
+          "title": "Title",
+          "type": "string"
+        },
+        "picture": {
+          "$ref": "#/$defs/MediaSlot"
+        },
+        "audio": {
+          "$ref": "#/$defs/MediaSlot"
+        },
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/Line"
+          },
+          "title": "Lines",
+          "type": "array"
+        },
+        "influence": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InfluenceWindow"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "duration_s": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration S"
+        },
+        "visible_when": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Condition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "effects": {
+          "items": {
+            "$ref": "#/$defs/Effect"
+          },
+          "title": "Effects",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "title",
+        "picture",
+        "audio",
+        "lines",
+        "influence",
+        "duration_s",
+        "visible_when",
+        "effects"
+      ],
+      "title": "Beat",
+      "type": "object"
+    },
+    "Character": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "color": {
+          "default": "#8a8f98",
+          "title": "Color",
+          "type": "string"
+        },
+        "base_profile": {
+          "$ref": "#/$defs/BaseProfile"
+        },
+        "portraits": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Portraits",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "color",
+        "base_profile",
+        "portraits"
+      ],
+      "title": "Character",
+      "type": "object"
+    },
+    "ChoiceOption": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "meaning": {
+          "default": "",
+          "title": "Meaning",
+          "type": "string"
+        },
+        "goes_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goes To"
+        },
+        "effects": {
+          "items": {
+            "$ref": "#/$defs/Effect"
+          },
+          "title": "Effects",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "meaning",
+        "goes_to",
+        "effects"
+      ],
+      "title": "ChoiceOption",
+      "type": "object"
+    },
+    "ChoicePoint": {
+      "additionalProperties": false,
+      "properties": {
+        "prompt": {
+          "default": "",
+          "title": "Prompt",
+          "type": "string"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/ChoiceOption"
+          },
+          "title": "Options",
+          "type": "array"
+        },
+        "countdown_s": {
+          "default": 30,
+          "exclusiveMinimum": 0,
+          "title": "Countdown S",
+          "type": "number"
+        }
+      },
+      "required": [
+        "prompt",
+        "options",
+        "countdown_s"
+      ],
+      "title": "ChoicePoint",
+      "type": "object"
+    },
+    "Condition": {
+      "additionalProperties": false,
+      "description": "A test on one story variable, e.g. mara_trust lt 2.",
+      "properties": {
+        "variable": {
+          "title": "Variable",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "eq",
+            "ne",
+            "lt",
+            "le",
+            "gt",
+            "ge",
+            "is_set",
+            "not_set",
+            "contains"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "variable",
+        "op",
+        "value"
+      ],
+      "title": "Condition",
+      "type": "object"
+    },
+    "Effect": {
+      "additionalProperties": false,
+      "description": "A change to one story variable, e.g. mara_trust add -1.",
+      "properties": {
+        "variable": {
+          "title": "Variable",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "set",
+            "add",
+            "toggle",
+            "clear"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "variable",
+        "op",
+        "value"
+      ],
+      "title": "Effect",
+      "type": "object"
+    },
+    "ExitRule": {
+      "additionalProperties": false,
+      "properties": {
+        "when": {
+          "$ref": "#/$defs/Condition"
+        },
+        "goes_to": {
+          "title": "Goes To",
+          "type": "string"
+        }
+      },
+      "required": [
+        "when",
+        "goes_to"
+      ],
+      "title": "ExitRule",
+      "type": "object"
+    },
+    "InfluenceWindow": {
+      "additionalProperties": false,
+      "properties": {
+        "prompt": {
+          "default": "",
+          "title": "Prompt",
+          "type": "string"
+        },
+        "duration_s": {
+          "default": 30,
+          "exclusiveMinimum": 0,
+          "title": "Duration S",
+          "type": "number"
+        },
+        "fills_variable": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fills Variable"
+        }
+      },
+      "required": [
+        "prompt",
+        "duration_s",
+        "fills_variable"
+      ],
+      "title": "InfluenceWindow",
+      "type": "object"
+    },
+    "Lane": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "default": "",
+          "title": "Label",
+          "type": "string"
+        },
+        "beats": {
+          "items": {
+            "$ref": "#/$defs/Beat"
+          },
+          "title": "Beats",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "beats"
+      ],
+      "title": "Lane",
+      "type": "object"
+    },
+    "LaneRule": {
+      "additionalProperties": false,
+      "properties": {
+        "when": {
+          "$ref": "#/$defs/Condition"
+        },
+        "goes_to": {
+          "title": "Goes To",
+          "type": "string"
+        }
+      },
+      "required": [
+        "when",
+        "goes_to"
+      ],
+      "title": "LaneRule",
+      "type": "object"
+    },
+    "Line": {
+      "additionalProperties": false,
+      "description": "Authored line, or an AI line whose `text` is its default line.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "speaker": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Speaker"
+        },
+        "kind": {
+          "default": "authored",
+          "enum": [
+            "authored",
+            "ai"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "text": {
+          "default": "",
+          "title": "Text",
+          "type": "string"
+        },
+        "intent": {
+          "default": "",
+          "title": "Intent",
+          "type": "string"
+        },
+        "action": {
+          "default": "",
+          "title": "Action",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "speaker",
+        "kind",
+        "text",
+        "intent",
+        "action"
+      ],
+      "title": "Line",
+      "type": "object"
+    },
+    "MediaSlot": {
+      "additionalProperties": false,
+      "description": "hold = keep what the previous beat showed or played; set = use asset; clear = nothing.",
+      "properties": {
+        "mode": {
+          "default": "hold",
+          "enum": [
+            "hold",
+            "set",
+            "clear"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "asset": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset"
+        }
+      },
+      "required": [
+        "mode",
+        "asset"
+      ],
+      "title": "MediaSlot",
+      "type": "object"
+    },
+    "MemoryNote": {
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "about": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "About"
+        },
+        "pinned": {
+          "default": false,
+          "title": "Pinned",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "text",
+        "about",
+        "pinned"
+      ],
+      "title": "MemoryNote",
+      "type": "object"
+    },
+    "Point": {
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "default": 0,
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "default": 0,
+          "title": "Y",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "Point",
+      "type": "object"
+    },
+    "Scene": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "summary": {
+          "default": "",
+          "title": "Summary",
+          "type": "string"
+        },
+        "position": {
+          "$ref": "#/$defs/Point"
+        },
+        "steps": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "beat": "#/$defs/Beat",
+                "split": "#/$defs/Split"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/Beat"
+              },
+              {
+                "$ref": "#/$defs/Split"
+              }
+            ]
+          },
+          "title": "Steps",
+          "type": "array"
+        },
+        "exit": {
+          "$ref": "#/$defs/SceneExit"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "position",
+        "steps",
+        "exit"
+      ],
+      "title": "Scene",
+      "type": "object"
+    },
+    "SceneExit": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "default": "end",
+          "enum": [
+            "next",
+            "choice",
+            "variable",
+            "end"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "goes_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goes To"
+        },
+        "choice": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChoicePoint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/ExitRule"
+          },
+          "title": "Rules",
+          "type": "array"
+        },
+        "otherwise": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Otherwise"
+        }
+      },
+      "required": [
+        "kind",
+        "goes_to",
+        "choice",
+        "rules",
+        "otherwise"
+      ],
+      "title": "SceneExit",
+      "type": "object"
+    },
+    "Split": {
+      "additionalProperties": false,
+      "description": "Stacked lanes inside a scene. Exactly one lane plays, then the scene continues.",
+      "properties": {
+        "kind": {
+          "const": "split",
+          "default": "split",
+          "title": "Kind",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "picked_by": {
+          "default": "choice",
+          "enum": [
+            "choice",
+            "variable"
+          ],
+          "title": "Picked By",
+          "type": "string"
+        },
+        "choice": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChoicePoint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/LaneRule"
+          },
+          "title": "Rules",
+          "type": "array"
+        },
+        "otherwise": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Otherwise"
+        },
+        "lanes": {
+          "items": {
+            "$ref": "#/$defs/Lane"
+          },
+          "title": "Lanes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "picked_by",
+        "choice",
+        "rules",
+        "otherwise",
+        "lanes"
+      ],
+      "title": "Split",
+      "type": "object"
+    },
+    "StorySettings": {
+      "additionalProperties": false,
+      "properties": {
+        "stage_style": {
+          "default": "visual_novel",
+          "enum": [
+            "visual_novel",
+            "subtitles"
+          ],
+          "title": "Stage Style",
+          "type": "string"
+        },
+        "reading_chars_per_s": {
+          "default": 15,
+          "exclusiveMinimum": 0,
+          "title": "Reading Chars Per S",
+          "type": "number"
+        },
+        "min_beat_s": {
+          "default": 2.5,
+          "exclusiveMinimum": 0,
+          "title": "Min Beat S",
+          "type": "number"
+        },
+        "thumbs_up_factor": {
+          "default": 1.0,
+          "minimum": 0,
+          "title": "Thumbs Up Factor",
+          "type": "number"
+        },
+        "match_threshold": {
+          "default": 0.35,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Match Threshold",
+          "type": "number"
+        }
+      },
+      "required": [
+        "stage_style",
+        "reading_chars_per_s",
+        "min_beat_s",
+        "thumbs_up_factor",
+        "match_threshold"
+      ],
+      "title": "StorySettings",
+      "type": "object"
+    },
+    "StoryVariable": {
+      "additionalProperties": false,
+      "description": "A named value defined in the outline that choices and the audience can change.",
+      "properties": {
+        "name": {
+          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "number",
+            "flag",
+            "text"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "default",
+        "description"
+      ],
+      "title": "StoryVariable",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "description": {
+      "default": "",
+      "title": "Description",
+      "type": "string"
+    },
+    "start_scene": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Start Scene"
+    },
+    "settings": {
+      "$ref": "#/$defs/StorySettings"
+    },
+    "characters": {
+      "items": {
+        "$ref": "#/$defs/Character"
+      },
+      "title": "Characters",
+      "type": "array"
+    },
+    "variables": {
+      "items": {
+        "$ref": "#/$defs/StoryVariable"
+      },
+      "title": "Variables",
+      "type": "array"
+    },
+    "memory_seed": {
+      "items": {
+        "$ref": "#/$defs/MemoryNote"
+      },
+      "title": "Memory Seed",
+      "type": "array"
+    },
+    "scenes": {
+      "items": {
+        "$ref": "#/$defs/Scene"
+      },
+      "title": "Scenes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "title",
+    "description",
+    "start_scene",
+    "settings",
+    "characters",
+    "variables",
+    "memory_seed",
+    "scenes"
+  ],
+  "title": "Story",
+  "type": "object"
+}

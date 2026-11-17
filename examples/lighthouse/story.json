@@ -1,0 +1,871 @@
+{
+  "schema_version": 1,
+  "title": "The Lighthouse Keeper",
+  "description": "A storm, a stranger at the door, and a lamp that must be lit before the ships come in. A small example that uses every part of the story format.",
+  "start_scene": "storm",
+  "settings": {
+    "stage_style": "visual_novel",
+    "reading_chars_per_s": 15.0,
+    "min_beat_s": 2.5,
+    "thumbs_up_factor": 1.0,
+    "match_threshold": 0.35
+  },
+  "characters": [
+    {
+      "id": "mara",
+      "name": "Mara",
+      "color": "#c46f4f",
+      "base_profile": {
+        "summary": "The lighthouse keeper, alone for eleven winters.",
+        "personality": "Dry, guarded, quietly funny; softens slowly.",
+        "motivations": "Keep the lamp lit. Keep people at arm's length.",
+        "speaking_style": "Short sentences. Deflects with jokes. Never says thank you directly.",
+        "knows": "The lamp's mechanism is failing.",
+        "hides": "She let a ship wreck once, years ago."
+      },
+      "portraits": [
+        "assets/mara.svg"
+      ]
+    },
+    {
+      "id": "tobin",
+      "name": "Tobin",
+      "color": "#4f7fc4",
+      "base_profile": {
+        "summary": "A young fisherman whose boat broke up on the rocks.",
+        "personality": "Earnest, talkative, a bit nosy.",
+        "motivations": "Get warm, get home, find out why the lamp was dark.",
+        "speaking_style": "Rambling, polite, asks a lot of questions.",
+        "knows": "His brother's boat is still out in the storm.",
+        "hides": ""
+      },
+      "portraits": [
+        "assets/tobin.svg"
+      ]
+    }
+  ],
+  "variables": [
+    {
+      "name": "mara_trust",
+      "type": "number",
+      "default": 2,
+      "description": "How much Mara trusts Tobin (0 to 5)."
+    },
+    {
+      "name": "dog_name",
+      "type": "text",
+      "default": "Biscuit",
+      "description": "The audience names Mara's dog."
+    },
+    {
+      "name": "lamp_lit",
+      "type": "flag",
+      "default": false,
+      "description": "Whether the great lamp is burning."
+    }
+  ],
+  "memory_seed": [
+    {
+      "text": "The dog sleeps on Mara's boots and growls at strangers.",
+      "about": "mara",
+      "pinned": false
+    }
+  ],
+  "scenes": [
+    {
+      "id": "storm",
+      "title": "Storm at the Door",
+      "summary": "Tobin, soaked, pounds on the lighthouse door. Mara's dog barks.",
+      "position": {
+        "x": 0.0,
+        "y": 160.0
+      },
+      "steps": [
+        {
+          "kind": "beat",
+          "id": "storm_1",
+          "title": "",
+          "picture": {
+            "mode": "set",
+            "asset": "assets/storm.svg"
+          },
+          "audio": {
+            "mode": "hold",
+            "asset": null
+          },
+          "lines": [
+            {
+              "id": "storm_1a",
+              "speaker": null,
+              "kind": "authored",
+              "text": "Rain hammers the rocks. Someone is pounding on the lighthouse door.",
+              "intent": "",
+              "action": ""
+            }
+          ],
+          "influence": null,
+          "duration_s": null,
+          "visible_when": null,
+          "effects": []
+        },
+        {
+          "kind": "beat",
+          "id": "storm_2",
+          "title": "",
+          "picture": {
+            "mode": "hold",
+            "asset": null
+          },
+          "audio": {
+            "mode": "hold",
+            "asset": null
+          },
+          "lines": [
+            {
+              "id": "storm_2a",
+              "speaker": "tobin",
+              "kind": "authored",
+              "text": "Please! My boat's gone, I just need somewhere dry!",
+              "intent": "",
+              "action": "shouting through the door"
+            }
+          ],
+          "influence": null,
+          "duration_s": null,
+          "visible_when": null,
+          "effects": []
+        },
+        {
+          "kind": "beat",
+          "id": "storm_3",
+          "title": "",
+          "picture": {
+            "mode": "hold",
+            "asset": null
+          },
+          "audio": {
+            "mode": "hold",
+            "asset": null
+          },
+          "lines": [
+            {
+              "id": "storm_3a",
+              "speaker": "mara",
+              "kind": "ai",
+              "text": "Quiet, {dog_name}. It's only a drowned rat.",
+              "intent": "Mara hushes her dog by name (use dog_name) and makes a dry joke about the stranger.",
+              "action": ""
+            }
+          ],
+          "influence": {
+            "prompt": "Mara's dog is barking at the door. What's the dog's name?",
+            "duration_s": 25.0,
+            "fills_variable": "dog_name"
+          },
+          "duration_s": null,
+          "visible_when": null,
+          "effects": []
+        }
+      ],
+      "exit": {
+        "kind": "choice",
+        "goes_to": null,
+        "choice": {
+          "prompt": "Should Mara open the door?",
+          "options": [
+            {
+              "id": "storm_let_in",
+              "label": "Let him in",
+              "meaning": "open the door, help him, be kind, let the stranger inside",
+              "goes_to": "fire",
+              "effects": [
+                {
+                  "variable": "mara_trust",
+                  "op": "add",
+                  "value": 1
+                }
+              ]
+            },
+            {
+              "id": "storm_turn_away",
+              "label": "Turn him away",
+              "meaning": "keep the door shut, send him away, don't trust him",
+              "goes_to": "tower",
+              "effects": [
+                {
+                  "variable": "mara_trust",
+                  "op": "add",
+                  "value": -2
+                }
+              ]
+            }
+          ],
+          "countdown_s": 30.0
+        },
+        "rules": [],
+        "otherwise": null
+      }
+    },
+    {
+      "id": "fire",
+      "title": "By the Fire",
+      "summary": "Tobin dries off. He notices something about the lighthouse.",
+      "position": {
+        "x": 360.0,
+        "y": 40.0
+      },
+      "steps": [
+        {
+          "kind": "beat",
+          "id": "fire_1",
+          "title": "",
+          "picture": {
+            "mode": "set",
+            "asset": "assets/fire.svg"
+          },
+          "audio": {
+            "mode": "hold",
+            "asset": null
+          },
+          "lines": [
+            {
+              "id": "fire_1a",
+              "speaker": "tobin",
+              "kind": "authored",
+              "text": "Thank you. Really. I'm Tobin.",
+              "intent": "",
+              "action": ""
+            },
+            {
+              "id": "fire_1b",
+              "speaker": "mara",
+              "kind": "ai",
+              "text": "Don't drip on {dog_name}.",
+              "intent": "Mara answers Tobin's thanks without accepting it; mention the dog by name.",
+              "action": ""
+            }
+          ],
+          "influence": null,
+          "duration_s": null,
+          "visible_when": null,
+          "effects": []
+        },
+        {
+          "kind": "split",
+          "id": "fire_split",
+          "picked_by": "choice",
+          "choice": {
+            "prompt": "What does Tobin notice?",
+            "options": [
+              {
+                "id": "fire_opt_lamp",
+                "label": "The lamp is dark",
+                "meaning": "the light, the lamp is out, broken lighthouse",
+                "goes_to": "fire_lane_lamp",
+                "effects": []
+              },
+              {
+                "id": "fire_opt_photo",
+                "label": "An old photograph",
+                "meaning": "the picture, the photo, her past, a ship",
+                "goes_to": "fire_lane_photo",
+                "effects": []
+              }
+            ],
+            "countdown_s": 20.0
+          },
+          "rules": [],
+          "otherwise": null,
+          "lanes": [
+            {
+              "id": "fire_lane_lamp",
+              "label": "The lamp",
+              "beats": [
+                {
+                  "kind": "beat",
+                  "id": "fire_lamp_1",
+                  "title": "",
+                  "picture": {
+                    "mode": "hold",
+                    "asset": null
+                  },
+                  "audio": {
+                    "mode": "hold",
+                    "asset": null
+                  },
+                  "lines": [
+                    {
+                      "id": "fire_lamp_1a",
+                      "speaker": "tobin",
+                      "kind": "authored",
+                      "text": "Why isn't the light on? That's why I hit the rocks!",
+                      "intent": "",
+                      "action": ""
+                    }
+                  ],
+                  "influence": null,
+                  "duration_s": null,
+                  "visible_when": null,
+                  "effects": [
+                    {
+                      "variable": "mara_trust",
+                      "op": "add",
+                      "value": -1
+                    }
+                  ]
+                },
+                {
+                  "kind": "beat",
+                  "id": "fire_lamp_2",
+                  "title": "",
+                  "picture": {
+                    "mode": "hold",
+                    "asset": null
+                  },
+                  "audio": {
+                    "mode": "hold",
+                    "asset": null
+                  },
+                  "lines": [
+                    {
+                      "id": "fire_lamp_2a",
+                      "speaker": "mara",
+                      "kind": "ai",
+                      "text": "The mechanism jams. I've been fixing it all night.",
+                      "intent": "Mara admits, defensively, that the lamp mechanism is failing.",
+                      "action": ""
+                    }
+                  ],
+                  "influence": null,
+                  "duration_s": null,
+                  "visible_when": null,
+                  "effects": []
+                }
+              ]
+            },
+            {
+              "id": "fire_lane_photo",
+              "label": "The photograph",
+              "beats": [
+                {
+                  "kind": "beat",
+                  "id": "fire_photo_1",
+                  "title": "",
+                  "picture": {
+                    "mode": "hold",
+                    "asset": null
+                  },
+                  "audio": {
+                    "mode": "hold",
+                    "asset": null
+                  },
+                  "lines": [
+                    {
+                      "id": "fire_photo_1a",
+                      "speaker": "tobin",
+                      "kind": "authored",
+                      "text": "Is that you? With the ship behind you?",
+                      "intent": "",
+                      "action": ""
+                    }
+                  ],
+                  "influence": null,
+                  "duration_s": null,
+                  "visible_when": null,
+                  "effects": []
+                },
+                {
+                  "kind": "beat",
+                  "id": "fire_photo_2",
+                  "title": "",
+                  "picture": {
+                    "mode": "hold",
+                    "asset": null
+                  },
+                  "audio": {
+                    "mode": "hold",
+                    "asset": null
+                  },
+                  "lines": [
+                    {
+                      "id": "fire_photo_2a",
+                      "speaker": "mara",
+                      "kind": "ai",
+                      "text": "A long time ago. Leave it.",
+                      "intent": "Mara shuts the subject down; hint at a past shipwreck without saying it.",
+                      "action": ""
+                    }
+                  ],
+                  "influence": null,
+                  "duration_s": null,
+                  "visible_when": null,
+                  "effects": [
+                    {
+                      "variable": "mara_trust",
+                      "op": "add",
+                      "value": 1
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "kind": "beat",
+          "id": "fire_3",
+          "title": "",
+          "picture": {
+            "mode": "hold",
+            "asset": null
+          },
+          "audio": {
+            "mode": "hold",
+            "asset": null
+          },
+          "lines": [
+            {
+              "id": "fire_3a",
+              "speaker": "mara",
+              "kind": "authored",
+              "text": "Come on. If you're staying, you're climbing.",
+              "intent": "",
+              "action": ""
+            }
+          ],
+          "influence": null,
+          "duration_s": null,
+          "visible_when": null,
+          "effects": []
+        }
+      ],
+      "exit": {
+        "kind": "next",
+        "goes_to": "lamp",
+        "choice": null,
+        "rules": [],
+        "otherwise": null
+      }
+    },
+    {
+      "id": "tower",
+      "title": "Alone in the Tower",
+      "summary": "Mara climbs to the lamp alone, with the knocking still echoing below.",
+      "position": {
+        "x": 360.0,
+        "y": 300.0
+      },
+      "steps": [
+        {
+          "kind": "beat",
+          "id": "tower_1",
+          "title": "",
+          "picture": {
+            "mode": "set",
+            "asset": "assets/tower.svg"
+          },
+          "audio": {
+            "mode": "hold",
+            "asset": null
+          },
+          "lines": [
+            {
+              "id": "tower_1a",
+              "speaker": null,
+              "kind": "authored",
+              "text": "The knocking stops. Mara climbs the stairs alone.",
+              "intent": "",
+              "action": ""
+            }
+          ],
+          "influence": null,
+          "duration_s": null,
+          "visible_when": null,
+          "effects": []
+        },
+        {
+          "kind": "split",
+          "id": "tower_split",
+          "picked_by": "variable",
+          "choice": null,
+          "rules": [
+            {
+              "when": {
+                "variable": "mara_trust",
+                "op": "lt",
+                "value": 1
+              },
+              "goes_to": "tower_lane_bitter"
+            }
+          ],
+          "otherwise": "tower_lane_doubt",
+          "lanes": [
+            {
+              "id": "tower_lane_bitter",
+              "label": "Bitter",
+              "beats": [
+                {
+                  "kind": "beat",
+                  "id": "tower_bitter_1",
+                  "title": "",
+                  "picture": {
+                    "mode": "hold",
+                    "asset": null
+                  },
+                  "audio": {
+                    "mode": "hold",
+                    "asset": null
+                  },
+                  "lines": [
+                    {
+                      "id": "tower_bitter_1a",
+                      "speaker": "mara",
+                      "kind": "ai",
+                      "text": "Strangers. Always wanting something.",
+                      "intent": "Mara mutters bitterly to herself about the stranger.",
+                      "action": ""
+                    }
+                  ],
+                  "influence": null,
+                  "duration_s": null,
+                  "visible_when": null,
+                  "effects": []
+                }
+              ]
+            },
+            {
+              "id": "tower_lane_doubt",
+              "label": "Doubt",
+              "beats": [
+                {
+                  "kind": "beat",
+                  "id": "tower_doubt_1",
+                  "title": "",
+                  "picture": {
+                    "mode": "hold",
+                    "asset": null
+                  },
+                  "audio": {
+                    "mode": "hold",
+                    "asset": null
+                  },
+                  "lines": [
+                    {
+                      "id": "tower_doubt_1a",
+                      "speaker": "mara",
+                      "kind": "ai",
+                      "text": "...Maybe I should have opened the door.",
+                      "intent": "Mara second-guesses herself, talking to the dog.",
+                      "action": ""
+                    }
+                  ],
+                  "influence": null,
+                  "duration_s": null,
+                  "visible_when": null,
+                  "effects": []
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "exit": {
+        "kind": "next",
+        "goes_to": "lamp",
+        "choice": null,
+        "rules": [],
+        "otherwise": null
+      }
+    },
+    {
+      "id": "lamp",
+      "title": "The Lamp",
+      "summary": "The great lamp is jammed. Ships are coming. Whatever happens next decides the night.",
+      "position": {
+        "x": 720.0,
+        "y": 160.0
+      },
+      "steps": [
+        {
+          "kind": "beat",
+          "id": "lamp_1",
+          "title": "",
+          "picture": {
+            "mode": "set",
+            "asset": "assets/lamp.svg"
+          },
+          "audio": {
+            "mode": "hold",
+            "asset": null
+          },
+          "lines": [
+            {
+              "id": "lamp_1a",
+              "speaker": null,
+              "kind": "authored",
+              "text": "The great lamp groans. The gears are stuck fast.",
+              "intent": "",
+              "action": ""
+            }
+          ],
+          "influence": null,
+          "duration_s": null,
+          "visible_when": null,
+          "effects": []
+        },
+        {
+          "kind": "beat",
+          "id": "lamp_2",
+          "title": "",
+          "picture": {
+            "mode": "hold",
+            "asset": null
+          },
+          "audio": {
+            "mode": "hold",
+            "asset": null
+          },
+          "lines": [
+            {
+              "id": "lamp_2a",
+              "speaker": "mara",
+              "kind": "ai",
+              "text": "Hold the crank. On three.",
+              "intent": "Mara asks Tobin for help, which costs her pride.",
+              "action": ""
+            }
+          ],
+          "influence": null,
+          "duration_s": null,
+          "visible_when": {
+            "variable": "mara_trust",
+            "op": "ge",
+            "value": 3
+          },
+          "effects": []
+        },
+        {
+          "kind": "beat",
+          "id": "lamp_3",
+          "title": "",
+          "picture": {
+            "mode": "hold",
+            "asset": null
+          },
+          "audio": {
+            "mode": "hold",
+            "asset": null
+          },
+          "lines": [
+            {
+              "id": "lamp_3a",
+              "speaker": "mara",
+              "kind": "ai",
+              "text": "Alright. Let's try it your way.",
+              "intent": "Mara reacts to the audience's best idea for fixing the lamp and tries it.",
+              "action": ""
+            }
+          ],
+          "influence": {
+            "prompt": "How should they get the lamp working?",
+            "duration_s": 30.0,
+            "fills_variable": null
+          },
+          "duration_s": null,
+          "visible_when": null,
+          "effects": [
+            {
+              "variable": "lamp_lit",
+              "op": "set",
+              "value": true
+            }
+          ]
+        }
+      ],
+      "exit": {
+        "kind": "choice",
+        "goes_to": null,
+        "choice": {
+          "prompt": "A ship's lights appear. Does Mara keep the lamp burning, or go down to the rocks to help?",
+          "options": [
+            {
+              "id": "lamp_keep",
+              "label": "Keep the lamp burning",
+              "meaning": "stay at the lamp, keep the light on, guide the ship",
+              "goes_to": "dawn",
+              "effects": []
+            },
+            {
+              "id": "lamp_rocks",
+              "label": "Go down to the rocks",
+              "meaning": "leave the lamp, run to the rocks, rescue, go help",
+              "goes_to": "rocks",
+              "effects": [
+                {
+                  "variable": "lamp_lit",
+                  "op": "set",
+                  "value": false
+                }
+              ]
+            }
+          ],
+          "countdown_s": 30.0
+        },
+        "rules": [],
+        "otherwise": null
+      }
+    },
+    {
+      "id": "rocks",
+      "title": "On the Rocks",
+      "summary": "Down at the waterline, in the dark.",
+      "position": {
+        "x": 1080.0,
+        "y": 300.0
+      },
+      "steps": [
+        {
+          "kind": "beat",
+          "id": "rocks_1",
+          "title": "",
+          "picture": {
+            "mode": "set",
+            "asset": "assets/dark.svg"
+          },
+          "audio": {
+            "mode": "hold",
+            "asset": null
+          },
+          "lines": [
+            {
+              "id": "rocks_1a",
+              "speaker": null,
+              "kind": "authored",
+              "text": "Without the light, the sea is just noise and cold.",
+              "intent": "",
+              "action": ""
+            }
+          ],
+          "influence": null,
+          "duration_s": null,
+          "visible_when": null,
+          "effects": []
+        }
+      ],
+      "exit": {
+        "kind": "variable",
+        "goes_to": null,
+        "choice": null,
+        "rules": [
+          {
+            "when": {
+              "variable": "mara_trust",
+              "op": "ge",
+              "value": 3
+            },
+            "goes_to": "dawn"
+          }
+        ],
+        "otherwise": "dark"
+      }
+    },
+    {
+      "id": "dawn",
+      "title": "Ending: The Light Holds",
+      "summary": "",
+      "position": {
+        "x": 1440.0,
+        "y": 40.0
+      },
+      "steps": [
+        {
+          "kind": "beat",
+          "id": "dawn_1",
+          "title": "",
+          "picture": {
+            "mode": "set",
+            "asset": "assets/dawn.svg"
+          },
+          "audio": {
+            "mode": "hold",
+            "asset": null
+          },
+          "lines": [
+            {
+              "id": "dawn_1a",
+              "speaker": null,
+              "kind": "authored",
+              "text": "Morning. The ship is safe in the harbour.",
+              "intent": "",
+              "action": ""
+            },
+            {
+              "id": "dawn_1b",
+              "speaker": "mara",
+              "kind": "ai",
+              "text": "Same time next storm, then. {dog_name} will want his boots back.",
+              "intent": "Mara's last line: a joke that shows she has changed, mentioning the dog or a running joke from memory.",
+              "action": ""
+            }
+          ],
+          "influence": null,
+          "duration_s": null,
+          "visible_when": null,
+          "effects": []
+        }
+      ],
+      "exit": {
+        "kind": "end",
+        "goes_to": null,
+        "choice": null,
+        "rules": [],
+        "otherwise": null
+      }
+    },
+    {
+      "id": "dark",
+      "title": "Ending: Dark Water",
+      "summary": "",
+      "position": {
+        "x": 1440.0,
+        "y": 300.0
+      },
+      "steps": [
+        {
+          "kind": "beat",
+          "id": "dark_1",
+          "title": "",
+          "picture": {
+            "mode": "hold",
+            "asset": null
+          },
+          "audio": {
+            "mode": "hold",
+            "asset": null
+          },
+          "lines": [
+            {
+              "id": "dark_1a",
+              "speaker": null,
+              "kind": "authored",
+              "text": "The storm passes. Not everyone does.",
+              "intent": "",
+              "action": ""
+            }
+          ],
+          "influence": null,
+          "duration_s": null,
+          "visible_when": null,
+          "effects": []
+        }
+      ],
+      "exit": {
+        "kind": "end",
+        "goes_to": null,
+        "choice": null,
+        "rules": [],
+        "otherwise": null
+      }
+    }
+  ]
+}
