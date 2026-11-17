@@ -28,7 +28,8 @@ export function reuse(take: Take): GenerateRequest {
   return { ...blankRequest(), ...take.request, seed: null };
 }
 
-export const picturesNeeded = (frames: GenerateRequest["frames"]) => (frames === "firstlast" ? 2 : 1);
+export const picturesNeeded = (frames: GenerateRequest["frames"]) =>
+  frames === "none" ? 0 : frames === "firstlast" ? 2 : 1;
 
 /** The shortest H3 length that holds `seconds` of sound (mirrors stages.fit_duration). */
 export function fitDuration(seconds: number, durations: number[]): number {
@@ -54,7 +55,12 @@ export const STATUS_LABEL: Record<TakeStatus, string> = {
   cancelled: "Cancelled",
 };
 
-export const FRAMES_LABEL = { first: "First frame", last: "Last frame", firstlast: "First + last" } as const;
+export const FRAMES_LABEL = {
+  none: "No picture",
+  first: "First frame",
+  last: "Last frame",
+  firstlast: "First + last",
+} as const;
 export const AUDIO_LABEL = { native: "Native", clip: "Your clip", voice: "Voice reference" } as const;
 
 /** The name a media id was uploaded with (ids are "<8 hex>-<name>"). */

@@ -17,6 +17,8 @@ from pydantic import BaseModel, ConfigDict, Field
 PACK_SCHEMA_VERSION = 1
 DEFAULT_PACK = Path(__file__).resolve().parents[2] / "workflow_packs" / "h3_seed_hunter"
 MEDIA_KINDS = ("picture", "video", "audio")
+# The node that pins a picture to a frame of the video (H3 frame guide).
+FRAME_GUIDE = "MiniMaxH3AddGuide"
 
 
 class PackError(ValueError):
@@ -79,6 +81,35 @@ class Pack:
                 if param.type in ("audio", "references") and subfolder:
                     param.upload_subfolder = param.upload_subfolder or subfolder
             self.stages[stage.id] = stage
+        # Built here, not shipped in the pack: a no-picture twin of every first-frame video stage.
+        self._built_recipes: dict[str, dict[str, Any]] = {}
+        for stage in list(self.stages.values()):
+            if stage.id.startswith("video_") and stage.id.endswith("_first"):
+                self._add_no_picture_stage(stage)
+
+    def _add_no_picture_stage(self, source: Stage) -> None:
+        """`video_*_none`: the `*_first` stage with its frame guide taken out, so the prompt
+        alone drives the video (H3's T2VA format). Other references (audio) work as before."""
+        spec = source.model_dump()
+        spec["id"] = source.id.removesuffix("_first") + "_none"
+        spec["title"] = source.title.replace("first frame", "no picture")
+        spec["frames"] = "none"
+        spec["built_from"] = source.id
+        for param in spec["params"]:
+            if param["type"] == "references":
+                requires = {
+                    k: n for k, n in (param.get("requires") or {}).items() if k != "picture"
+                }
+                param["requires"] = requires or None
+                param["required"] = bool(requires)
+                param["description"] = "No picture: the prompt alone sets the scene"
+        stage = Stage.model_validate(spec)
+        recipe = without_frame_guides(self._load_recipe(source))
+        for param in stage.params:
+            if param.node_id not in recipe:
+                raise PackError(f"Stage {stage.id!r}: node {param.node_id} is missing")
+        self.stages[stage.id] = stage
+        self._built_recipes[stage.id] = recipe
 
     def _load_recipe(self, stage: Stage) -> dict[str, Any]:
         path = (self.folder / stage.recipe).resolve()
@@ -88,7 +119,10 @@ class Pack:
 
     @cached_property
     def _recipes(self) -> dict[str, dict[str, Any]]:
-        return {sid: self._load_recipe(stage) for sid, stage in self.stages.items()}
+        return {
+            sid: self._built_recipes.get(sid) or self._load_recipe(stage)
+            for sid, stage in self.stages.items()
+        }
 
     def stage(self, stage_id: str) -> Stage:
         if stage_id not in self.stages:
@@ -140,6 +174,62 @@ class Pack:
             else:
                 _set_input(inputs, param.input_name, _coerce(param, value))
         return workflow
+
+
+# -- recipes built from the pack's own ------------------------------------------------------------
+
+
+def without_frame_guides(recipe: dict[str, Any]) -> dict[str, Any]:
+    """A copy of `recipe` with its frame guides taken out.
+
+    A frame guide takes the conditioning in its `positive` input and passes it on (output 0) with
+    a picture pinned to a frame. Whatever read the guide now reads that `positive` input, and the
+    guide and the nodes that only fed it (the picture resize) are dropped.
+    """
+    workflow = copy.deepcopy(recipe)
+    guides = [nid for nid, node in workflow.items() if node.get("class_type") == FRAME_GUIDE]
+    if not guides:
+        raise PackError("The recipe has no frame guide to take out")
+    for gid in guides:
+        positive = workflow[gid].get("inputs", {}).get("positive")
+        if not _is_link(positive):
+            raise PackError(f"Frame guide {gid} has no linked 'positive' input")
+        for nid, node in workflow.items():
+            inputs = node.get("inputs", {})
+            for name, value in inputs.items():
+                if _is_link(value) and str(value[0]) == gid:
+                    if value[1] != 0:
+                        raise PackError(f"Node {nid} reads output {value[1]} of frame guide {gid}")
+                    inputs[name] = list(positive)
+    removed = [workflow.pop(gid) for gid in guides]
+    pending = [
+        str(v[0]) for node in removed for v in node.get("inputs", {}).values() if _is_link(v)
+    ]
+    while pending:
+        nid = pending.pop()
+        if nid in workflow and not _has_readers(workflow, nid):
+            node = workflow.pop(nid)
+            pending += [str(v[0]) for v in node.get("inputs", {}).values() if _is_link(v)]
+    return workflow
+
+
+def _is_link(value: Any) -> bool:
+    """A recipe input that reads another node's output: `[node id, output index]`."""
+    return (
+        isinstance(value, list)
+        and len(value) == 2
+        and isinstance(value[0], (str, int))
+        and isinstance(value[1], int)
+        and not isinstance(value[1], bool)
+    )
+
+
+def _has_readers(workflow: dict[str, Any], nid: str) -> bool:
+    return any(
+        _is_link(v) and str(v[0]) == nid
+        for node in workflow.values()
+        for v in node.get("inputs", {}).values()
+    )
 
 
 # -- turning values into what the nodes read ------------------------------------------------------

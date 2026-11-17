@@ -16,7 +16,7 @@ Vocabulary for each app lives in its `CONTEXT.md`; see `CONTEXT-MAP.md`.
 - Desktop window (pywebview) over a local web app.
 - Talks to ComfyUI directly with its own copy of the H3 workflow pack (ADR-0006); ComfyUI must already be running (default `127.0.0.1:8188`, address in settings).
 - Shot list; drag shots to reorder the sequence.
-- Generate form driven by toggles: frame mode (first / last / first+last), audio (native / your clip / voice reference), upscale on or off. One take per generation.
+- Generate form driven by toggles: frame mode (first / last / first+last / no picture), audio (native / your clip / voice reference), upscale on or off. One take per generation.
 - Take list per shot with a player; select the take that plays.
 - "Upscale this take" adds an upscaled take that becomes selected (marked with an icon).
 - "Extend" creates a continuation shot (see ADR-0004).

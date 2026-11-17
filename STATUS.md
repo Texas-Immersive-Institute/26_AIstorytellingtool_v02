@@ -28,12 +28,15 @@ Takes has started (2026-11-13, user's call to begin it now): Takes talks to the 
 
 - [x] Python pinned to 3.14 with `.python-version` (2026-11-17): on a Windows PC `uv sync` picked Python 3.15, which onnxruntime 1.31.1 (needed by fastembed) has no packages for. Reproduced here with 3.15 and checked that `uv sync` replaces a 3.15 `.venv` with 3.14 once the pin is in place. Move the pin up when onnxruntime publishes 3.15 packages.
 
+- [x] Takes: no-picture takes (2026-11-17): a 'No picture' frame mode runs on the prompt alone (H3's T2VA format: no picture line, start with `integrated_multimodal_description:`). `Pack` builds `video_{1take,3takes,upscale}_{native,audio}_none` from each `*_first` stage by taking out the frame guide (`MiniMaxH3AddGuide`) and the picture resize that fed it; the pack files are unchanged. Works with native, your clip and voice reference audio, and with upscale this take. Also fixed the shot pane growing past the window under 1150 px when a take's prompt has a long word. 109 Python tests, ruff, 3 web tests and the build pass; in the browser a no-picture take was accepted as `video_1take_native_none` and failed cleanly because ComfyUI wasn't running. Not yet rendered by the real H3 ComfyUI.
+
 ## Next
 
 - [ ] Takes: show progress while rendering (ComfyUI websocket)
 - [ ] Takes: extend as continuation shots (ADR-0004: in-point on the low-res take, 24 fps ffmpeg copy of an upscaled source)
 - [ ] Takes: back-to-back sequence playback
 - [ ] Run `install.bat` on the Windows PC (winget installs, PATH refresh, both UI builds)
+- [ ] Takes: render a no-picture take on the real H3 ComfyUI and check the prompt alone sets the scene (the Ref2VA model and the T2VA prompt format are the ones the extend stages already use)
 - [ ] Takes: try the UI against the real H3 ComfyUI on the Windows PC (generate, voice reference, upscale) via `start-takes.bat`
 
 - [ ] 7. Step through a saved playthrough in the Debug view; polish

@@ -7,7 +7,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-Frames = Literal["first", "last", "firstlast"]
+# none: no picture; the prompt alone drives the video (built from the first-frame stages).
+Frames = Literal["none", "first", "last", "firstlast"]
 # native: the model makes the sound. clip: your audio file is the exact soundtrack (lip sync).
 # voice: a voice reference; Takes first speaks the line in that voice, then animates to it.
 Audio = Literal["native", "clip", "voice"]
@@ -52,7 +53,7 @@ def stage_for(frames: Frames, audio: Audio, upscale: bool) -> str:
 
 
 def pictures_needed(frames: Frames) -> int:
-    return 2 if frames == "firstlast" else 1
+    return {"none": 0, "firstlast": 2}.get(frames, 1)
 
 
 def fit_duration(seconds: float) -> float:
@@ -84,7 +85,7 @@ class GenerateRequest(BaseModel):
     audio: Audio = "native"
     upscale: bool = False
     # <Picture 1> is the first frame (or the last frame in "last" mode); with first+last,
-    # <Picture 2> is the last frame.
+    # <Picture 2> is the last frame. "none" takes no pictures.
     pictures: list[str] = Field(default_factory=list)
     audio_clip: str | None = None
     voice: VoiceReference | None = None
@@ -97,6 +98,8 @@ class GenerateRequest(BaseModel):
     def _inputs_match_toggles(self) -> GenerateRequest:
         need = pictures_needed(self.frames)
         if len(self.pictures) != need:
+            if need == 0:
+                raise ValueError("'No picture' uses no pictures; remove them or pick a frame mode")
             which = "a first and a last frame" if need == 2 else "one picture"
             raise ValueError(f"This frame mode needs {which} ({len(self.pictures)} given)")
         if self.audio == "clip" and not self.audio_clip:

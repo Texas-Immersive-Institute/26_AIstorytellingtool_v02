@@ -180,7 +180,7 @@ def create_app(
     @api.get("/options")
     def options() -> dict[str, Any]:
         return {
-            "frames": ["first", "last", "firstlast"],
+            "frames": ["first", "last", "firstlast", "none"],
             "audio": ["native", "clip", "voice"],
             "aspect_ratios": list(ASPECT_RATIOS),
             "durations": list(DURATIONS),

@@ -247,6 +247,33 @@ def test_your_clip_sets_the_length(client, shot, fake_comfy):
     assert take["stage"] == "video_1take_audio_first" and take["duration_s"] == 6.58
 
 
+def test_no_picture_runs_on_the_prompt_alone(client, shot, fake_comfy):
+    slug, shot_id = shot
+    take = wait_for(client, slug, generate(client, slug, shot_id, frames="none", seed=3))
+    assert take["status"] == "done", take
+    assert take["stage"] == "video_1take_native_none"
+    assert fake_comfy.uploads == []
+    workflow = fake_comfy.prompts[take["prompt_id"]]
+    assert json.loads(node_input(workflow, "references", take["stage"])) == []
+    assert not any(n["class_type"] == "MiniMaxH3AddGuide" for n in workflow.values())
+
+    up = wait_for(
+        client, slug, client.post(f"/api/projects/{slug}/takes/{take['id']}/upscale").json()["id"]
+    )
+    assert up["status"] == "done" and up["stage"] == "video_upscale_native_none"
+    assert node_input(fake_comfy.prompts[up["prompt_id"]], "seed", up["stage"]) == 3
+
+    clip = upload(client, slug, "line.mp3", b"mp3")
+    voiced = wait_for(
+        client, slug, generate(client, slug, shot_id, frames="none", audio="clip", audio_clip=clip)
+    )
+    assert voiced["stage"] == "video_1take_audio_none"
+    refs = json.loads(
+        node_input(fake_comfy.prompts[voiced["prompt_id"]], "references", voiced["stage"])
+    )
+    assert [r["kind"] for r in refs] == ["audio"]
+
+
 def test_a_failed_run_reports_the_node_error(client, shot, fake_comfy):
     slug, shot_id = shot
     fake_comfy.fail_next = "CUDA out of memory"

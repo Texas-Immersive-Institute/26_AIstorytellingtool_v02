@@ -1,6 +1,6 @@
 // Types mirror apps/takes/src/takes_app (api.py, store.py, stages.py, comfyui.py).
 
-export type Frames = "first" | "last" | "firstlast";
+export type Frames = "none" | "first" | "last" | "firstlast";
 export type Audio = "native" | "clip" | "voice";
 export type TakeStatus =
   | "queued"

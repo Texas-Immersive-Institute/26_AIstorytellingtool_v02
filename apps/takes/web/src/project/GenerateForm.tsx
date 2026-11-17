@@ -68,7 +68,9 @@ export function GenerateForm({
         <textarea
           rows={5}
           value={draft.prompt}
-          placeholder="What happens in this shot. Refer to the frame as <Picture 1>."
+          placeholder={
+            need ? "What happens in this shot. Refer to the frame as <Picture 1>." : "What happens in this shot."
+          }
           onChange={(e) => set({ prompt: e.target.value })}
         />
       </label>
@@ -82,6 +84,12 @@ export function GenerateForm({
           onChange={(frames) => set({ frames })}
         />
       </div>
+      {need === 0 && (
+        <p className="hint">
+          The prompt alone sets the scene. Start it with <code>integrated_multimodal_description:</code> and
+          no picture line.
+        </p>
+      )}
       <div className="slots">
         {pictures.map((id, i) => (
           <MediaSlot

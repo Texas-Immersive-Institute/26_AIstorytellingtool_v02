@@ -25,7 +25,8 @@ def test_toggles_pick_the_stage(pack):
     assert stage_for("last", "clip", False) == "video_1take_audio_last"
     assert stage_for("firstlast", "native", True) == "video_upscale_native_firstlast"
     # every toggle combination exists in the pack
-    for frames in ("first", "last", "firstlast"):
+    assert stage_for("none", "native", False) == "video_1take_native_none"
+    for frames in ("none", "first", "last", "firstlast"):
         for audio in ("native", "clip"):
             for upscale in (False, True):
                 pack.stage(stage_for(frames, audio, upscale))
@@ -34,6 +35,9 @@ def test_toggles_pick_the_stage(pack):
 def test_request_checks_inputs_against_toggles():
     GenerateRequest(prompt="p", pictures=["a"])
     GenerateRequest(prompt="p", frames="firstlast", pictures=["a", "b"])
+    assert GenerateRequest(prompt="p", frames="none").stage == "video_1take_native_none"
+    with pytest.raises(ValidationError, match="uses no pictures"):
+        GenerateRequest(prompt="p", frames="none", pictures=["a"])
     with pytest.raises(ValidationError, match="first and a last frame"):
         GenerateRequest(prompt="p", frames="firstlast", pictures=["a"])
     with pytest.raises(ValidationError, match="audio clip"):
@@ -106,6 +110,36 @@ def test_filling_a_recipe_sets_bound_inputs_only(pack):
     again = pack.fill(stage.id, {"prompt": "x", "references": [PIC]}, run_id="j2")
     assert again[stage.param("prompt").node_id]["inputs"]["prompt"] == "x"
     assert get("prompt") == "A keeper."
+
+
+def test_no_picture_stages_drop_the_frame_guide(pack):
+    audio = {"kind": "audio", "name": "a.mp3"}
+    for sid in [s for s in pack.stages if s.endswith("_none")]:
+        sound = [] if "native" in sid else [audio]
+        wf = pack.fill(sid, {"prompt": "p", "references": sound}, run_id="j")
+        first_id = sid.removesuffix("_none") + "_first"
+        first = pack.fill(first_id, {"prompt": "p", "references": [PIC, *sound]}, run_id="j")
+        assert not any(n["class_type"] == "MiniMaxH3AddGuide" for n in wf.values())
+        # the guide and the picture resize that only fed it are gone; nothing else changed
+        assert sorted(set(first) - set(wf)) == ["272", "274", "276"], sid
+        assert first["272"]["inputs"]["positive"] == ["459", 0]
+        assert wf["125:14"]["inputs"]["conditioning"] == ["459", 0], sid
+        assert all(_links_resolve(wf)), sid
+    assert {s for s in pack.stages if s.endswith("_none")} >= {
+        "video_1take_native_none",
+        "video_1take_audio_none",
+        "video_upscale_native_none",
+        "video_upscale_audio_none",
+    }
+    with pytest.raises(PackError, match="Reference media"):  # the audio is still needed
+        pack.fill("video_1take_audio_none", {"prompt": "p", "references": []}, run_id="j")
+
+
+def _links_resolve(wf):
+    for node in wf.values():
+        for v in node["inputs"].values():
+            if isinstance(v, list) and len(v) == 2 and isinstance(v[1], int):
+                yield str(v[0]) in wf
 
 
 def test_pack_refuses_bad_values(pack):
