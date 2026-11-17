@@ -26,6 +26,8 @@ Takes has started (2026-11-13, user's call to begin it now): Takes talks to the 
 - [x] Installers (2026-11-17): `install.command` (macOS) and `install.bat` (Windows) install uv, Node.js and ffmpeg when missing, run `uv sync`, then `npm ci` and build both UIs; safe to run again. `install.command` was run on this Mac (uv and Node present, no Homebrew, Homebrew declined): it synced, built both UIs and reported ffmpeg as missing. `install.bat` has not been run on Windows yet.
 - [x] Stopped tracking generated files (2026-11-17, user decision): `.gitignore` added; `node_modules/`, `dist/` and `__pycache__/` removed from git (about 7,750 files, still on disk). The tracked `node_modules` held the macOS-only `@rolldown/binding-darwin-arm64`, which broke UI builds on a Windows clone. Not committed yet.
 
+- [x] Python pinned to 3.14 with `.python-version` (2026-11-17): on a Windows PC `uv sync` picked Python 3.15, which onnxruntime 1.31.1 (needed by fastembed) has no packages for. Reproduced here with 3.15 and checked that `uv sync` replaces a 3.15 `.venv` with 3.14 once the pin is in place. Move the pin up when onnxruntime publishes 3.15 packages.
+
 ## Next
 
 - [ ] Takes: show progress while rendering (ComfyUI websocket)
